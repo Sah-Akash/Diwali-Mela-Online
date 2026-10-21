@@ -3,6 +3,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   MelaInteractableSpec,
   PartnerStallData,
+  RANGOLI_COLORS,
   THEME_COLORS,
   buildAllInteractables,
 } from '../data/melaData';
@@ -23,6 +24,7 @@ export type MelaMode =
   | 'balloon'
   | 'ring'
   | 'diya-game'
+  | 'rangoli'
   | 'ride'
   | 'well'
   | 'stage'
@@ -30,13 +32,15 @@ export type MelaMode =
   | 'finale';
 
 export interface GameHudState {
-  mode: 'balloon' | 'ring' | 'diya-game' | 'well';
+  mode: 'balloon' | 'ring' | 'diya-game' | 'rangoli' | 'well';
   shotsLeft: number;
   score: number;
   totalTargets?: number;
   done: boolean;
   message: string;
   spectator?: boolean;
+  selectedColor?: string;
+  symmetry?: boolean;
 }
 
 export interface CinematicBanner {
@@ -165,6 +169,20 @@ export class MelaEngine {
   } | null = null;
   private mandapDiyas: { group: THREE.Group; flame: THREE.Object3D; lit: boolean; index: number }[] = [];
   private daanPetiCollider: THREE.Object3D | null = null;
+
+  // Interactive 3D Floor Rangoli state
+  private rangoliGroup: THREE.Group | null = null;
+  private rangoliSegments: {
+    mesh: THREE.Mesh;
+    mat: THREE.MeshStandardMaterial;
+    ringIndex: number; // 0 = center, 1 = inner lotus, 2 = middle diamond, 3 = outer scallop
+    petalIndex: number;
+    filled: boolean;
+    colorHex: string;
+  }[] = [];
+  private rangoliBowls: { mesh: THREE.Object3D; hex: string; name: string }[] = [];
+  public selectedRangoliColor: string = RANGOLI_COLORS[0].hex;
+  public rangoliSymmetry = true;
 
   // Activity / Cinematic timers
   private entryStartTime = 0;
@@ -578,6 +596,9 @@ export class MelaEngine {
     this.carouselHorses = [];
     this.wellBikes = [];
     this.wellRings = [];
+    this.rangoliSegments = [];
+    this.rangoliBowls = [];
+    this.rangoliGroup = null;
 
     for (const spec of this.interactables) {
       switch (spec.type) {
@@ -598,6 +619,9 @@ export class MelaEngine {
           break;
         case 'daan-peti':
           this.buildDaanPeti(spec);
+          break;
+        case 'rangoli':
+          this.buildRangoliArea(spec);
           break;
         case 'wheel':
           this.buildFerrisWheel(spec);
@@ -1089,6 +1113,196 @@ export class MelaEngine {
     this.daanPetiCollider = collider;
 
     this.addContactShadow(group, 3.6, 3.6);
+    this.dynamicRoot.add(group);
+  }
+
+  private buildRangoliArea(spec: MelaInteractableSpec): void {
+    const group = new THREE.Group();
+    group.position.set(spec.x, 0, spec.z);
+    group.userData.spec = spec;
+    this.rangoliGroup = group;
+
+    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x2b1d28, roughness: 0.78, metalness: 0.08 });
+    const brassMat = new THREE.MeshStandardMaterial({ color: 0xf4b855, roughness: 0.26, metalness: 0.85 });
+    const chalkLineMat = new THREE.LineBasicMaterial({ color: 0xfff5de, transparent: true, opacity: 0.9 });
+
+    // 1. Raised Circular Courtyard Base + Brass Outer Rim
+    const courtyardBase = new THREE.Mesh(new THREE.CylinderGeometry(3.25, 3.4, 0.14, 32), stoneMat);
+    courtyardBase.position.y = 0.07;
+    courtyardBase.receiveShadow = true;
+    group.add(courtyardBase);
+
+    const outerBrassRing = new THREE.Mesh(new THREE.TorusGeometry(3.26, 0.06, 10, 40), brassMat);
+    outerBrassRing.rotation.x = Math.PI / 2;
+    outerBrassRing.position.y = 0.14;
+    group.add(outerBrassRing);
+
+    // Helper to register a clickable 3D floor pattern segment with white kolam chalk outline
+    const addFloorSegment = (
+      geo: THREE.BufferGeometry,
+      ringIndex: number,
+      petalIndex: number,
+      initialHex: string,
+      filled: boolean,
+      rotY = 0,
+      yOffset = 0.155
+    ) => {
+      const mat = new THREE.MeshStandardMaterial({
+        color: initialHex,
+        emissive: initialHex,
+        emissiveIntensity: filled ? 0.28 : 0.06,
+        roughness: 0.52,
+        metalness: 0.08,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = yOffset;
+
+      const edges = new THREE.EdgesGeometry(geo, 15);
+      const outline = new THREE.LineSegments(edges, chalkLineMat);
+      mesh.add(outline);
+
+      const segHolder = new THREE.Group();
+      segHolder.rotation.y = rotY;
+      segHolder.add(mesh);
+      group.add(segHolder);
+
+      const segRecord = {
+        mesh,
+        mat,
+        ringIndex,
+        petalIndex,
+        filled,
+        colorHex: initialHex,
+      };
+      mesh.userData.rangoliSegment = segRecord;
+      this.rangoliSegments.push(segRecord);
+    };
+
+    // 2. Ring 0: Central Bindu Lotus Medallion (1 segment)
+    const centerShape = new THREE.Shape();
+    centerShape.absarc(0, 0, 0.46, 0, Math.PI * 2, false);
+    const centerGeo = new THREE.ExtrudeGeometry(centerShape, { depth: 0.032, bevelEnabled: false });
+    addFloorSegment(centerGeo, 0, 0, '#ffb703', true, 0, 0.155);
+
+    // 3. Ring 1: 8 Sculpted Inner Ashtadala Lotus Petals
+    const lotusPetalShape = new THREE.Shape();
+    lotusPetalShape.moveTo(0, 0.52);
+    lotusPetalShape.quadraticCurveTo(0.34, 0.88, 0, 1.38);
+    lotusPetalShape.quadraticCurveTo(-0.34, 0.88, 0, 0.52);
+    const lotusPetalGeo = new THREE.ExtrudeGeometry(lotusPetalShape, { depth: 0.028, bevelEnabled: false });
+
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      // Start with first 2 petals pre-filled so visitors immediately see how vibrant it looks
+      const preFilled = i % 4 === 0;
+      addFloorSegment(
+        lotusPetalGeo,
+        1,
+        i,
+        preFilled ? '#e63946' : '#3a2938',
+        preFilled,
+        angle,
+        0.152
+      );
+    }
+
+    // 4. Ring 2: 8 Interleaved Geometric Star Diamonds (Konas)
+    const diamondShape = new THREE.Shape();
+    diamondShape.moveTo(0, 1.02);
+    diamondShape.lineTo(0.32, 1.52);
+    diamondShape.lineTo(0, 2.04);
+    diamondShape.lineTo(-0.32, 1.52);
+    diamondShape.closePath();
+    const diamondGeo = new THREE.ExtrudeGeometry(diamondShape, { depth: 0.025, bevelEnabled: false });
+
+    for (let i = 0; i < 8; i++) {
+      const angle = ((i + 0.5) / 8) * Math.PI * 2;
+      addFloorSegment(diamondGeo, 2, i, '#352535', false, angle, 0.15);
+    }
+
+    // 5. Ring 3: 8 Outer Scalloped Marigold Border Arcs
+    const arcShape = new THREE.Shape();
+    const halfSpan = Math.PI / 8 - 0.035;
+    arcShape.absarc(0, 0, 2.52, -halfSpan + Math.PI / 2, halfSpan + Math.PI / 2, false);
+    arcShape.absarc(0, 0, 2.08, halfSpan + Math.PI / 2, -halfSpan + Math.PI / 2, true);
+    arcShape.closePath();
+    const arcGeo = new THREE.ExtrudeGeometry(arcShape, { depth: 0.024, bevelEnabled: false });
+
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      addFloorSegment(arcGeo, 3, i, '#2f2030', false, angle, 0.148);
+    }
+
+    // 6. 8 Brass Katori Bowls of Vibrant Gulal Powder around the Courtyard Perimeter
+    for (let i = 0; i < RANGOLI_COLORS.length; i++) {
+      const cSpec = RANGOLI_COLORS[i];
+      const angle = (i / RANGOLI_COLORS.length) * Math.PI * 2 + 0.2;
+      const bx = Math.cos(angle) * 2.92;
+      const bz = Math.sin(angle) * 2.92;
+
+      const bowlGroup = new THREE.Group();
+      bowlGroup.position.set(bx, 0.14, bz);
+
+      const katori = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.16, 0.16, 14), brassMat);
+      katori.position.y = 0.08;
+      bowlGroup.add(katori);
+
+      const powderCone = new THREE.Mesh(
+        new THREE.ConeGeometry(0.21, 0.18, 14),
+        new THREE.MeshStandardMaterial({
+          color: cSpec.hex,
+          emissive: cSpec.hex,
+          emissiveIntensity: 0.32,
+          roughness: 0.6,
+        })
+      );
+      powderCone.position.y = 0.19;
+      bowlGroup.add(powderCone);
+
+      bowlGroup.traverse((child) => {
+        child.userData.rangoliBowlColor = cSpec.hex;
+        child.userData.rangoliBowlName = cSpec.name;
+      });
+
+      group.add(bowlGroup);
+      this.rangoliBowls.push({ mesh: bowlGroup, hex: cSpec.hex, name: cSpec.name });
+    }
+
+    // 7. 4 Lit Clay Diyas & Overhead Signboard Arch at back of the Rangoli Courtyard
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      const { group: diya } = this.createClayDiyaMesh(0.75, true);
+      diya.position.set(Math.cos(angle) * 3.15, 0.15, Math.sin(angle) * 3.15);
+      group.add(diya);
+    }
+
+    for (const side of [-1, 1]) {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 2.8, 10), brassMat);
+      pole.position.set(side * 1.45, 1.4, -3.1);
+      group.add(pole);
+    }
+
+    const signTex = createSignboardTexture(
+      this.renderer,
+      'रंगोली आँगन · RANGOLI ART',
+      'Click Floor Petals to Fill Colors · Pre-Defined Mandala',
+      '#3d101b',
+      '#ff6fa5',
+      '#fff5de'
+    );
+    const signBoard = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.1, 0.72),
+      new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide })
+    );
+    signBoard.position.set(0, 2.75, -3.1);
+    group.add(signBoard);
+
+    const rangoliLight = new THREE.PointLight(0xffb85c, 6.5, 9.5);
+    rangoliLight.position.set(0, 2.6, 0);
+    group.add(rangoliLight);
+
+    this.addContactShadow(group, 7.2, 7.2);
     this.dynamicRoot.add(group);
   }
 
@@ -1752,8 +1966,12 @@ export class MelaEngine {
           if (!this.checkDaanPetiClick(e.clientX, e.clientY)) {
             this.handleDiyaTap(e.clientX, e.clientY);
           }
+        } else if (this.mode === 'rangoli') {
+          this.handleRangoliTap(e.clientX, e.clientY);
         } else if (this.mode === 'walk') {
-          this.checkDaanPetiClick(e.clientX, e.clientY);
+          if (!this.checkDaanPetiClick(e.clientX, e.clientY)) {
+            this.checkRangoliClick(e.clientX, e.clientY);
+          }
         }
       } else if (this.mode === 'ring' && dragDy > 24) {
         this.handleRingToss(e.clientX, e.clientY);
@@ -1876,7 +2094,26 @@ export class MelaEngine {
     this.collectItem('Seva Daan Peti · Diwali Charity Blessing');
   }
 
-  public startMiniGame(gameMode: 'balloon' | 'ring' | 'diya-game', spec: MelaInteractableSpec): void {
+  private checkRangoliClick(clientX: number, clientY: number): boolean {
+    if (!this.rangoliGroup) return false;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.pointerNDC, this.camera);
+
+    const hits = this.raycaster.intersectObject(this.rangoliGroup, true);
+    if (hits.length > 0 && hits[0].distance < 18) {
+      const spec = this.interactables.find((s) => s.type === 'rangoli');
+      if (spec) {
+        this.audio.effect('sparkle');
+        this.startMiniGame('rangoli', spec);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public startMiniGame(gameMode: 'balloon' | 'ring' | 'diya-game' | 'rangoli', spec: MelaInteractableSpec): void {
     this.activeSpec = spec;
     if (gameMode === 'balloon') {
       for (const b of this.balloonTargets) {
@@ -1916,6 +2153,106 @@ export class MelaEngine {
         message: 'Tap each of the 7 earthen diyas around the Rangoli Mandap to light them!',
       };
       this.setMode('diya-game', spec);
+      this.callbacks.onGameUpdate({ ...this.gameState });
+    } else if (gameMode === 'rangoli') {
+      const filledCount = this.rangoliSegments.filter((s) => s.filled).length;
+      const total = this.rangoliSegments.length;
+      this.gameState = {
+        mode: 'rangoli',
+        shotsLeft: total - filledCount,
+        score: filledCount,
+        totalTargets: total,
+        done: filledCount >= total,
+        selectedColor: this.selectedRangoliColor,
+        symmetry: this.rangoliSymmetry,
+        message:
+          'Pick a Gulal color from the palette (or tap a 3D brass bowl) and click any floor petal or diamond to fill it!',
+      };
+      this.setMode('rangoli', spec);
+      this.callbacks.onGameUpdate({ ...this.gameState });
+    }
+  }
+
+  public setRangoliColor(hex: string): void {
+    this.selectedRangoliColor = hex;
+    this.audio.effect('click');
+    if (this.gameState && this.gameState.mode === 'rangoli') {
+      const cObj = RANGOLI_COLORS.find((c) => c.hex === hex);
+      this.gameState.selectedColor = hex;
+      this.gameState.message = `Selected ${cObj ? `${cObj.name} (${cObj.hindi})` : hex} — click any floor pattern segment to fill!`;
+      this.callbacks.onGameUpdate({ ...this.gameState });
+    }
+  }
+
+  public setRangoliSymmetry(symmetry: boolean): void {
+    this.rangoliSymmetry = symmetry;
+    this.audio.effect('click');
+    if (this.gameState && this.gameState.mode === 'rangoli') {
+      this.gameState.symmetry = symmetry;
+      this.gameState.message = symmetry
+        ? '8-Way Mandala Symmetry ON: clicking 1 petal fills the entire ring!'
+        : 'Single Petal Brush ON: click individual petals to paint custom patterns!';
+      this.callbacks.onGameUpdate({ ...this.gameState });
+    }
+  }
+
+  public applyRangoliPreset(preset: 'lotus' | 'peacock' | 'diwali' | 'clear'): void {
+    if (!this.rangoliGroup) return;
+
+    const ringColors: Record<'lotus' | 'peacock' | 'diwali', [string, string, string, string]> = {
+      lotus: ['#ffb703', '#ff2a85', '#fb8500', '#e63946'],
+      peacock: ['#ffb703', '#00b4d8', '#2ec4b6', '#8338ec'],
+      diwali: ['#fff5de', '#e63946', '#ffb703', '#fb8500'],
+    };
+
+    for (const seg of this.rangoliSegments) {
+      if (preset === 'clear') {
+        const defaultUnfilled =
+          seg.ringIndex === 0
+            ? '#3e2d3c'
+            : seg.ringIndex === 1
+            ? '#3a2938'
+            : seg.ringIndex === 2
+            ? '#352535'
+            : '#2f2030';
+        seg.filled = false;
+        seg.colorHex = defaultUnfilled;
+        seg.mat.color.set(defaultUnfilled);
+        seg.mat.emissive.set(defaultUnfilled);
+        seg.mat.emissiveIntensity = 0.06;
+      } else {
+        const pal = ringColors[preset];
+        // Alternate petals slightly in ring 3 for extra traditional vibrancy
+        const chosenHex =
+          seg.ringIndex === 3 && seg.petalIndex % 2 === 1
+            ? pal[1]
+            : pal[seg.ringIndex] || pal[0];
+        seg.filled = true;
+        seg.colorHex = chosenHex;
+        seg.mat.color.set(chosenHex);
+        seg.mat.emissive.set(chosenHex);
+        seg.mat.emissiveIntensity = 0.34;
+      }
+    }
+
+    if (preset === 'clear') {
+      this.audio.effect('click');
+    } else {
+      this.audio.effect('cheer');
+      this.spawnFireworkBurst(-6.2, 0.8, -8.2, 42, 0xffd27d);
+      this.collectItem('Shubh Rangoli Kalakar Souvenir');
+    }
+
+    if (this.gameState && this.gameState.mode === 'rangoli') {
+      const filledCount = this.rangoliSegments.filter((s) => s.filled).length;
+      const total = this.rangoliSegments.length;
+      this.gameState.score = filledCount;
+      this.gameState.shotsLeft = total - filledCount;
+      this.gameState.done = filledCount >= total;
+      this.gameState.message =
+        preset === 'clear'
+          ? 'Floor cleared to white Kolam chalk outline! Pick a color and tap any petal to paint.'
+          : 'Wah! Traditional Diwali Rangoli completed! Tap any petal to customize colors further.';
       this.callbacks.onGameUpdate({ ...this.gameState });
     }
   }
@@ -2046,6 +2383,93 @@ export class MelaEngine {
       this.callbacks.onStatsChange({ ...this.stats });
       this.callbacks.onGameUpdate({ ...this.gameState });
     }
+  }
+
+  private handleRangoliTap(clientX: number, clientY: number): void {
+    if (!this.gameState || this.gameState.mode !== 'rangoli' || !this.rangoliGroup) return;
+
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.pointerNDC, this.camera);
+
+    const hits = this.raycaster.intersectObject(this.rangoliGroup, true);
+    if (hits.length === 0) return;
+
+    // 1. Check if the user tapped one of the 8 3D brass color bowls around the Rangoli
+    for (const hit of hits) {
+      const bowlColor = hit.object.userData?.rangoliBowlColor;
+      if (bowlColor) {
+        this.setRangoliColor(bowlColor);
+        hit.object.getWorldPosition(_vec3);
+        const hexNum = parseInt(bowlColor.replace('#', ''), 16);
+        this.spawnFireworkBurst(_vec3.x, _vec3.y + 0.25, _vec3.z, 16, hexNum);
+        return;
+      }
+    }
+
+    // 2. Check if the user tapped one of the 25 pre-defined 3D mandala floor segments
+    let tappedSeg: (typeof this.rangoliSegments)[0] | null = null;
+    let hitPoint: THREE.Vector3 | null = null;
+
+    for (const hit of hits) {
+      const seg = hit.object.userData?.rangoliSegment || hit.object.parent?.userData?.rangoliSegment;
+      if (seg) {
+        tappedSeg = seg;
+        hitPoint = hit.point;
+        break;
+      }
+    }
+
+    if (!tappedSeg) return;
+
+    const hexColor = this.selectedRangoliColor;
+    const hexNum = parseInt(hexColor.replace('#', ''), 16);
+
+    if (this.rangoliSymmetry && tappedSeg.ringIndex > 0) {
+      // Fill all 8 symmetrical petals/diamonds/arcs in the tapped ring
+      for (const seg of this.rangoliSegments) {
+        if (seg.ringIndex === tappedSeg.ringIndex) {
+          seg.filled = true;
+          seg.colorHex = hexColor;
+          seg.mat.color.set(hexColor);
+          seg.mat.emissive.set(hexColor);
+          seg.mat.emissiveIntensity = 0.34;
+        }
+      }
+    } else {
+      tappedSeg.filled = true;
+      tappedSeg.colorHex = hexColor;
+      tappedSeg.mat.color.set(hexColor);
+      tappedSeg.mat.emissive.set(hexColor);
+      tappedSeg.mat.emissiveIntensity = 0.34;
+    }
+
+    if (hitPoint) {
+      this.spawnFireworkBurst(hitPoint.x, hitPoint.y + 0.25, hitPoint.z, 22, hexNum);
+    }
+    this.audio.effect('sparkle');
+
+    const filledCount = this.rangoliSegments.filter((s) => s.filled).length;
+    const total = this.rangoliSegments.length;
+    this.gameState.score = filledCount;
+    this.gameState.shotsLeft = total - filledCount;
+
+    if (filledCount >= total) {
+      if (!this.gameState.done) {
+        this.audio.effect('cheer');
+        this.spawnFireworkBurst(-6.2, 0.9, -8.2, 45, 0xffd27d);
+        this.collectItem('Shubh Rangoli Kalakar Souvenir');
+      }
+      this.gameState.done = true;
+      this.gameState.message =
+        'Adbhut! All 25 Mandala petals are glowing! Keep customizing colors or snap a Rangoli Postcard!';
+    } else {
+      const ringNames = ['Center Kamal Bindu', 'Inner Lotus Petals', 'Star Diamond Ring', 'Outer Marigold Border'];
+      this.gameState.message = `Colored ${ringNames[tappedSeg.ringIndex]} (${filledCount}/${total} filled)! Tap more petals or switch colors.`;
+    }
+
+    this.callbacks.onGameUpdate({ ...this.gameState });
   }
 
   public startRide(spec: MelaInteractableSpec): void {
@@ -2374,6 +2798,14 @@ export class MelaEngine {
       const spec = this.activeSpec!;
       this.camera.position.set(spec.x, 4.8, spec.z + 5.8);
       this.camera.lookAt(spec.x, 0.9, spec.z);
+      return;
+    }
+
+    if (this.mode === 'rangoli') {
+      const spec = this.activeSpec!;
+      // Overhead artist perspective looking down at the 3D Rangoli courtyard & 8 color bowls
+      this.camera.position.set(spec.x, 5.5, spec.z + 3.0);
+      this.camera.lookAt(spec.x, 0.15, spec.z - 0.15);
       return;
     }
 

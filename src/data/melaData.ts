@@ -8,6 +8,7 @@ export type InteractableType =
   | 'balloon'
   | 'ring'
   | 'diya-game'
+  | 'rangoli'
   | 'wheel'
   | 'carousel'
   | 'pirate-ship'
@@ -17,6 +18,24 @@ export type InteractableType =
   | 'photo'
   | 'fireworks'
   | 'finale';
+
+export interface RangoliColorSpec {
+  id: string;
+  name: string;
+  hindi: string;
+  hex: string;
+}
+
+export const RANGOLI_COLORS: RangoliColorSpec[] = [
+  { id: 'kumkum', name: 'Kumkum Red', hindi: 'कुमकुम लाल', hex: '#e63946' },
+  { id: 'haldi', name: 'Haldi Gold', hindi: 'हल्दी पीला', hex: '#ffb703' },
+  { id: 'genda', name: 'Marigold Orange', hindi: 'गेंदा केसरी', hex: '#fb8500' },
+  { id: 'gulabi', name: 'Rani Pink', hindi: 'रानी गुलाबी', hex: '#ff2a85' },
+  { id: 'morpankh', name: 'Peacock Blue', hindi: 'मोरपंखी नीला', hex: '#00b4d8' },
+  { id: 'panna', name: 'Mango Leaf Green', hindi: 'पन्ना हरा', hex: '#2ec4b6' },
+  { id: 'jamuni', name: 'Royal Jamuni', hindi: 'जामुनी बैंगनी', hex: '#8338ec' },
+  { id: 'safed', name: 'Chalk White', hindi: 'चावल सफ़ेद', hex: '#fff5de' },
+];
 
 export interface PartnerStallData {
   id: string;
@@ -407,6 +426,20 @@ export const CORE_MELA_ATTRACTIONS: MelaInteractableSpec[] = [
       'Apne ghar ke diye toh har koi jalata hai, asli Diwali toh tab hai jab aapki wajah se kisi gareeb ke ghar chulha jal paata hai. Scan the QR code to bring warm food, mithai, and smiles to a family in need tonight!',
     description:
       'Traditional brass-bound Daan Peti next to the 7 Diyas Mandap. Click to scan the QR code and help underprivileged families celebrate Diwali.',
+  },
+  {
+    id: 'rangoli-art',
+    name: 'Rangoli Aangan · Interactive Floor Art',
+    hindiSub: 'रंगोली आँगन • अपने हाथों से दिवाली रंगोली सजाएं',
+    type: 'rangoli',
+    x: -6.2,
+    z: -8.2,
+    rotY: Math.PI / 6,
+    theme: 'gulabi',
+    greeting:
+      'Aaiye! Rangoli ke bina Diwali adhoori hai! Choose vibrant gulal colors from the brass bowls and tap the petals on the floor to fill your auspicious Ashtadala Lotus Rangoli!',
+    description:
+      'Pick traditional gulal colors and click the pre-defined 3D mandala petals on the floor to create your own glowing Diwali Rangoli.',
   },
 
   // Rides & Cultural Stage

@@ -21,10 +21,12 @@ import {
   Play,
   Pause,
   Heart,
+  Palette,
 } from 'lucide-react';
 import {
   MelaInteractableSpec,
   PartnerStallData,
+  RANGOLI_COLORS,
   loadCustomPartnerStalls,
   saveCustomPartnerStall,
 } from './data/melaData';
@@ -459,6 +461,7 @@ export default function App() {
                 { id: 'game-balloon', label: 'Balloon Shoot' },
                 { id: 'game-ring', label: 'Golden Ring Toss' },
                 { id: 'game-diya', label: 'Light 7 Diyas' },
+                { id: 'rangoli-art', label: '🎨 Rangoli Floor Art' },
                 { id: 'daan-peti', label: '🪔 Charity Daan Peti' },
                 { id: 'ride-wheel', label: 'Chand Wala Jhoola' },
                 { id: 'stage-ramleela', label: 'Ram Leela Stage' },
@@ -553,7 +556,7 @@ export default function App() {
                           item.type === 'well' ||
                           item.type === 'stage'
                         ? '#4cc9f0'
-                        : item.type === 'balloon' || item.type === 'ring' || item.type === 'diya-game'
+                        : item.type === 'balloon' || item.type === 'ring' || item.type === 'diya-game' || item.type === 'rangoli'
                         ? '#ff4d6d'
                         : item.type === 'daan-peti'
                         ? '#ffd700'
@@ -682,6 +685,8 @@ export default function App() {
               <div className="text-[10px] font-semibold tracking-wider text-[#f1aa49]">
                 {nearSpec.type === 'daan-peti'
                   ? 'CLICK BOX OR PRESS E · SCAN CHARITY QR'
+                  : nearSpec.type === 'rangoli'
+                  ? 'CLICK FLOOR OR PRESS E · PAINT 3D RANGOLI'
                   : nearSpec.type === 'stage'
                   ? 'WATCH RAM LEELA & DEEPOTSAV'
                   : nearSpec.type === 'wheel' ||
@@ -724,84 +729,182 @@ export default function App() {
         </div>
       )}
 
-      {/* ACTIVE MINI-GAME HUD (Balloon Shoot, Ring Toss, Light 7 Diyas, Well of Death) */}
-      {gameHud && (mode === 'balloon' || mode === 'ring' || mode === 'diya-game' || mode === 'well') && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-20 w-[92vw] max-w-lg pointer-events-auto">
-          <div className="rounded-2xl bg-[#10182b]/95 border border-[#f1aa49]/50 p-4 shadow-2xl text-center">
-            <div className="flex items-center justify-between text-xs font-semibold text-[#f1aa49] mb-1">
-              <span>
-                {gameHud.mode === 'balloon'
-                  ? 'NISHANA LAGAO · FREE TO PLAY'
-                  : gameHud.mode === 'ring'
-                  ? 'RING TOSS · FREE TO PLAY'
-                  : gameHud.mode === 'diya-game'
-                  ? 'DEEPOTSAV MANDAP · LIGHT 7 DIYAS'
-                  : 'MAUT KA KUAN · WELL OF DEATH'}
-              </span>
-              <span className="font-mono-num text-[#fff5de]">
-                {gameHud.mode === 'well'
-                  ? `${gameHud.shotsLeft}s left · Rings: ${gameHud.score}/8`
-                  : gameHud.mode === 'diya-game'
-                  ? `Diyas Lit: ${gameHud.score}/7`
-                  : `${gameHud.shotsLeft} ${gameHud.mode === 'balloon' ? 'shots' : 'rings'} left · Score: ${gameHud.score}`}
-              </span>
-            </div>
-
-            <p className="text-sm text-[#fff3d6] mb-3">{gameHud.message}</p>
-
-            {/* Well of Death Rider Steering Buttons */}
-            {gameHud.mode === 'well' && !gameHud.spectator && !gameHud.done && (
-              <div className="flex items-center justify-center gap-2 mb-3">
-                <button
-                  onPointerDown={() => engineRef.current?.setWellControl(1, false)}
-                  onPointerUp={() => engineRef.current?.setWellControl(0, false)}
-                  className="px-3.5 py-1.5 rounded-lg bg-[#1d2842] border border-[#f1aa49]/40 text-xs font-semibold text-[#fff5de] cursor-pointer"
-                >
-                  Steer Higher ▲ (W)
-                </button>
-                <button
-                  onPointerDown={() => engineRef.current?.setWellControl(-1, false)}
-                  onPointerUp={() => engineRef.current?.setWellControl(0, false)}
-                  className="px-3.5 py-1.5 rounded-lg bg-[#1d2842] border border-[#f1aa49]/40 text-xs font-semibold text-[#fff5de] cursor-pointer"
-                >
-                  Steer Lower ▼ (S)
-                </button>
-                <button
-                  onPointerDown={() => engineRef.current?.setWellControl(0, true)}
-                  onPointerUp={() => engineRef.current?.setWellControl(0, false)}
-                  className="px-3.5 py-1.5 rounded-lg bg-[#f1aa49] text-[#121726] text-xs font-bold cursor-pointer"
-                >
-                  Turbo Boost ⚡ (Space)
-                </button>
+      {/* ACTIVE MINI-GAME HUD (Balloon Shoot, Ring Toss, Light 7 Diyas, Rangoli Art, Well of Death) */}
+      {gameHud &&
+        (mode === 'balloon' ||
+          mode === 'ring' ||
+          mode === 'diya-game' ||
+          mode === 'rangoli' ||
+          mode === 'well') && (
+          <div className="fixed top-16 left-1/2 -translate-x-1/2 z-20 w-[94vw] max-w-xl pointer-events-auto">
+            <div className="rounded-2xl bg-[#10182b]/95 border border-[#f1aa49]/50 p-4 shadow-2xl text-center">
+              <div className="flex items-center justify-between text-xs font-semibold text-[#f1aa49] mb-1">
+                <span>
+                  {gameHud.mode === 'balloon'
+                    ? 'NISHANA LAGAO · FREE TO PLAY'
+                    : gameHud.mode === 'ring'
+                    ? 'RING TOSS · FREE TO PLAY'
+                    : gameHud.mode === 'diya-game'
+                    ? 'DEEPOTSAV MANDAP · LIGHT 7 DIYAS'
+                    : gameHud.mode === 'rangoli'
+                    ? 'RANGOLI AANGAN · CLICK FLOOR PETALS TO FILL COLORS'
+                    : 'MAUT KA KUAN · WELL OF DEATH'}
+                </span>
+                <span className="font-mono-num text-[#fff5de]">
+                  {gameHud.mode === 'well'
+                    ? `${gameHud.shotsLeft}s left · Rings: ${gameHud.score}/8`
+                    : gameHud.mode === 'diya-game'
+                    ? `Diyas Lit: ${gameHud.score}/7`
+                    : gameHud.mode === 'rangoli'
+                    ? `Petals Colored: ${gameHud.score}/${gameHud.totalTargets || 25}`
+                    : `${gameHud.shotsLeft} ${gameHud.mode === 'balloon' ? 'shots' : 'rings'} left · Score: ${gameHud.score}`}
+                </span>
               </div>
-            )}
 
-            <div className="flex items-center justify-center gap-3">
-              {gameHud.done && activeSpec && (
-                <button
-                  onClick={() => {
-                    if (gameHud.mode === 'well') {
-                      engineRef.current?.startWellOfDeath(false, activeSpec);
-                    } else {
-                      engineRef.current?.startMiniGame(gameHud.mode, activeSpec);
-                    }
-                  }}
-                  className="px-4 py-2 rounded-lg bg-[#f1aa49] text-[#121726] text-xs font-semibold hover:bg-[#ffbe61] transition-colors cursor-pointer"
-                >
-                  Play Again Free ↻
-                </button>
+              <p className="text-xs sm:text-sm text-[#fff3d6] mb-3">{gameHud.message}</p>
+
+              {/* RANGOLI COLOR PALETTE, SYMMETRY & PRE-DEFINED PATTERN CONTROLS */}
+              {gameHud.mode === 'rangoli' && (
+                <div className="space-y-2.5 mb-3">
+                  {/* 8 Traditional Gulal Color Swatches */}
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {RANGOLI_COLORS.map((c) => {
+                      const isSelected = (gameHud.selectedColor || RANGOLI_COLORS[0].hex) === c.hex;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => engineRef.current?.setRangoliColor(c.hex)}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-transform cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#233253] border-2 border-[#fff5de] text-[#fff5de] scale-105 shadow-md'
+                              : 'bg-[#0b101d] border border-[#f1aa49]/30 text-[#d8c39e] hover:border-[#f1aa49]'
+                          }`}
+                          title={`${c.name} (${c.hindi})`}
+                        >
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border border-white/40 shrink-0"
+                            style={{ backgroundColor: c.hex }}
+                          />
+                          <span>{c.name.split(' ')[0]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Brush Mode + Pre-Defined Pattern Templates */}
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        engineRef.current?.setRangoliSymmetry(!(gameHud.symmetry ?? true))
+                      }
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors cursor-pointer ${
+                        gameHud.symmetry ?? true
+                          ? 'bg-[#f1aa49]/25 border-[#f1aa49] text-[#fff5de]'
+                          : 'bg-[#0b101d] border-[#f1aa49]/30 text-[#d8c39e]'
+                      }`}
+                    >
+                      {gameHud.symmetry ?? true
+                        ? '✦ 8-Way Ring Symmetry: ON'
+                        : '• Single Petal Brush: ON'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => engineRef.current?.applyRangoliPreset('lotus')}
+                      className="px-2.5 py-1 rounded-lg bg-[#1d2842] border border-[#f1aa49]/30 text-[11px] font-medium text-[#ffd27d] hover:bg-[#273659] cursor-pointer"
+                    >
+                      Lotus Pattern
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => engineRef.current?.applyRangoliPreset('peacock')}
+                      className="px-2.5 py-1 rounded-lg bg-[#1d2842] border border-[#f1aa49]/30 text-[11px] font-medium text-[#7ce8ff] hover:bg-[#273659] cursor-pointer"
+                    >
+                      Peacock Pattern
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => engineRef.current?.applyRangoliPreset('diwali')}
+                      className="px-2.5 py-1 rounded-lg bg-[#1d2842] border border-[#f1aa49]/30 text-[11px] font-medium text-[#fff5de] hover:bg-[#273659] cursor-pointer"
+                    >
+                      Swarna Deep
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => engineRef.current?.applyRangoliPreset('clear')}
+                      className="px-2.5 py-1 rounded-lg bg-[#0b101d] border border-[#f1aa49]/25 text-[11px] font-medium text-[#d8c39e] hover:text-white cursor-pointer"
+                    >
+                      Clear Chalk Outline
+                    </button>
+                  </div>
+                </div>
               )}
 
-              <button
-                onClick={() => engineRef.current?.leaveActivity()}
-                className="px-4 py-2 rounded-lg bg-[#1d2842] border border-[#f1aa49]/35 text-xs font-medium text-[#fff5de] hover:bg-[#273659] transition-colors cursor-pointer"
-              >
-                Back to Mela ×
-              </button>
+              {/* Well of Death Rider Steering Buttons */}
+              {gameHud.mode === 'well' && !gameHud.spectator && !gameHud.done && (
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <button
+                    onPointerDown={() => engineRef.current?.setWellControl(1, false)}
+                    onPointerUp={() => engineRef.current?.setWellControl(0, false)}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#1d2842] border border-[#f1aa49]/40 text-xs font-semibold text-[#fff5de] cursor-pointer"
+                  >
+                    Steer Higher ▲ (W)
+                  </button>
+                  <button
+                    onPointerDown={() => engineRef.current?.setWellControl(-1, false)}
+                    onPointerUp={() => engineRef.current?.setWellControl(0, false)}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#1d2842] border border-[#f1aa49]/40 text-xs font-semibold text-[#fff5de] cursor-pointer"
+                  >
+                    Steer Lower ▼ (S)
+                  </button>
+                  <button
+                    onPointerDown={() => engineRef.current?.setWellControl(0, true)}
+                    onPointerUp={() => engineRef.current?.setWellControl(0, false)}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#f1aa49] text-[#121726] text-xs font-bold cursor-pointer"
+                  >
+                    Turbo Boost ⚡ (Space)
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-center justify-center gap-3">
+                {gameHud.mode === 'rangoli' && (
+                  <button
+                    onClick={handleSnapPostcard}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#f1aa49] text-[#121726] text-xs font-bold hover:bg-[#ffbe61] transition-colors cursor-pointer"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    Snap Rangoli Postcard
+                  </button>
+                )}
+
+                {gameHud.done && activeSpec && gameHud.mode !== 'rangoli' && (
+                  <button
+                    onClick={() => {
+                      if (gameHud.mode === 'well') {
+                        engineRef.current?.startWellOfDeath(false, activeSpec);
+                      } else {
+                        engineRef.current?.startMiniGame(gameHud.mode, activeSpec);
+                      }
+                    }}
+                    className="px-4 py-2 rounded-lg bg-[#f1aa49] text-[#121726] text-xs font-semibold hover:bg-[#ffbe61] transition-colors cursor-pointer"
+                  >
+                    Play Again Free ↻
+                  </button>
+                )}
+
+                <button
+                  onClick={() => engineRef.current?.leaveActivity()}
+                  className="px-4 py-2 rounded-lg bg-[#1d2842] border border-[#f1aa49]/35 text-xs font-medium text-[#fff5de] hover:bg-[#273659] transition-colors cursor-pointer"
+                >
+                  Back to Mela ×
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* ACTIVE RIDE / STAGE / FIREWORKS SHOW PROGRESS BAR */}
       {(mode === 'ride' || mode === 'firework-show' || mode === 'stage') && rideProgress && (
@@ -1032,6 +1135,19 @@ export default function App() {
                   className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
                 >
                   Light All 7 Deepotsav Mandap Diyas · FREE →
+                </button>
+              )}
+
+              {talkSpec.type === 'rangoli' && (
+                <button
+                  onClick={() => {
+                    const s = talkSpec;
+                    setTalkSpec(null);
+                    engineRef.current?.startMiniGame('rangoli', s);
+                  }}
+                  className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
+                >
+                  Pick Gulal Colors &amp; Paint 3D Floor Rangoli · FREE →
                 </button>
               )}
 
@@ -1429,6 +1545,20 @@ export default function App() {
                 className="px-2.5 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
                 7 Diyas Mandap
+              </button>
+              <button
+                onClick={() => {
+                  const spec = engineRef.current?.interactables.find((s) => s.type === 'rangoli');
+                  if (spec) {
+                    engineRef.current?.teleportTo('rangoli-art');
+                    engineRef.current?.startMiniGame('rangoli', spec);
+                  }
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#261a36] border border-[#ff6fa5]/45 hover:bg-[#35234b] text-xs font-semibold text-[#ffc2dc] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                title="Paint the 3D Floor Rangoli Mandala"
+              >
+                <Palette className="w-3.5 h-3.5 text-[#ff6fa5]" />
+                Rangoli Art
               </button>
               <button
                 onClick={() => {
