@@ -76,12 +76,14 @@ export default function App() {
   });
 
   // UI Overlays & Dock State
+  const [menuOpen, setMenuOpen] = useState(false);
   const [dockCollapsed, setDockCollapsed] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [bagOpen, setBagOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
   const [radioOpen, setRadioOpen] = useState(false);
+
   const [radioPlaying, setRadioPlaying] = useState(true);
   const [radioTrackIdx, setRadioTrackIdx] = useState(0);
   const [radioVolume, setRadioVolume] = useState(0.75);
@@ -331,95 +333,179 @@ export default function App() {
       {/* Dedicated Empty WebGL Canvas Mount Container (Zero Viewport Occlusion) */}
       <div ref={canvasHostRef} className="fixed inset-0 w-full h-full z-0" />
 
-      {/* Top Bar Contract: 3 Zones Separated by gap-8 */}
-      <header className="fixed top-0 left-0 right-0 z-20 flex items-center justify-between gap-8 px-5 py-3 bg-[#0d1322]/90 border-b border-[#f1aa49]/25">
-        {/* Zone 1: Single text element wordmark */}
+      {/* Compact Transparent Diya Menu Button & Dropdown (Top-Right Corner) */}
+      <div className="fixed top-3.5 right-4 z-30 flex flex-col items-end pointer-events-auto">
         <button
-          onClick={() => {
-            if (mode === 'welcome') {
-              engineRef.current?.enterMela();
-            } else {
-              engineRef.current?.teleportTo('photo-booth');
-            }
-          }}
-          className="text-lg font-display font-bold tracking-tight text-[#fff5de] whitespace-nowrap shrink-0 cursor-pointer text-left"
+          onClick={() => setMenuOpen((prev) => !prev)}
+          aria-expanded={menuOpen}
+          aria-label="Open Diwali Mela Menu"
+          className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0d1322]/55 hover:bg-[#141d33]/80 backdrop-blur-md border border-[#f1aa49]/40 hover:border-[#f1aa49]/80 text-[#fff5de] shadow-[0_4px_20px_rgba(0,0,0,0.45)] transition-all cursor-pointer"
         >
-          Diwali Mela Online
+          {/* Glowing Mini Diya SVG Icon */}
+          <svg
+            viewBox="0 0 32 32"
+            className="w-4 h-4 shrink-0 drop-shadow-[0_0_6px_rgba(255,180,50,0.85)] transition-transform group-hover:scale-110"
+            aria-hidden="true"
+          >
+            <path
+              d="M16 3 C16 3 21 9.5 19.5 14 C18.6 16.8 17.2 18 16 18 C14.8 18 13.4 16.8 12.5 14 C11 9.5 16 3 16 3 Z"
+              fill="#ffbe42"
+            />
+            <path
+              d="M16 7 C16 7 18.5 11 18 14 C17.5 15.8 16.8 16.6 16 16.6 C15.2 16.6 14.5 15.8 14 14 C13.5 11 16 7 16 7 Z"
+              fill="#fff7d6"
+            />
+            <path
+              d="M4 19 Q16 16.5 28 19 C26.5 26 21.5 29.5 16 29.5 C10.5 29.5 5.5 26 4 19 Z"
+              fill="#d94e1f"
+              stroke="#ffd27d"
+              strokeWidth="1.5"
+            />
+          </svg>
+          <span className="text-xs font-semibold tracking-wider text-[#fff5de]">Menu</span>
+          <ChevronDown
+            className={`w-3.5 h-3.5 text-[#f1aa49] transition-transform duration-200 ${
+              menuOpen ? 'rotate-180' : ''
+            }`}
+          />
         </button>
 
-        {/* Zone 2: 5 concise single-line navigation links */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-[#d8c39e]">
-          <button
-            onClick={() => {
-              if (mode === 'welcome') engineRef.current?.enterMela();
-              setMapOpen((prev) => !prev);
-            }}
-            className="hover:text-[#fff5de] hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            Mela Map
-          </button>
-          <button
-            onClick={() => setRadioOpen((prev) => !prev)}
-            className="hover:text-[#fff5de] hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            Bhajans & Radio
-          </button>
-          <button
-            onClick={() => setBagOpen(true)}
-            className="hover:text-[#fff5de] hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            Mela Bag ({stats.items.length})
-          </button>
-          <button
-            onClick={() => setStallModal('create')}
-            className="hover:text-[#fff5de] hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            Promote Your Shop
-          </button>
-          <button
-            onClick={() => setSupportOpen(true)}
-            className="hover:text-[#fff5de] hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            Daan Peti QR
-          </button>
-        </nav>
+        {menuOpen && (
+          <div className="mt-2 w-52 rounded-2xl bg-[#0c1221]/78 backdrop-blur-xl border border-[#f1aa49]/35 p-1.5 shadow-[0_12px_36px_rgba(0,0,0,0.65)] text-xs text-[#f7e7c4]">
+            {/* Primary Action Item */}
+            {mode === 'welcome' ? (
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  engineRef.current?.enterMela();
+                }}
+                className="flex items-center justify-between w-full px-3 py-2 mb-1 rounded-xl bg-[#f1aa49]/90 hover:bg-[#ffbe61] text-[#121726] font-bold transition-colors cursor-pointer"
+              >
+                <span>Enter Diwali Mela</span>
+                <span>→</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  engineRef.current?.startGrandFinale();
+                }}
+                className="flex items-center justify-between w-full px-3 py-2 mb-1 rounded-xl bg-[#f1aa49]/90 hover:bg-[#ffbe61] text-[#121726] font-bold transition-colors cursor-pointer"
+              >
+                <span>1008 Akashdeep Finale</span>
+                <span>✦</span>
+              </button>
+            )}
 
-        {/* Zone 3: 1 Primary Action CTA */}
-        <div className="flex items-center gap-3 shrink-0">
-          {mode === 'welcome' ? (
             <button
-              onClick={() => engineRef.current?.enterMela()}
-              className="px-4 py-2 text-xs font-semibold text-[#121726] bg-[#f1aa49] rounded-lg hover:bg-[#ffbe61] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              onClick={() => {
+                setMenuOpen(false);
+                if (mode === 'welcome') engineRef.current?.enterMela();
+                setMapOpen((prev) => !prev);
+              }}
+              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-white/10 text-left transition-colors cursor-pointer"
             >
-              Enter Diwali Mela →
+              <Compass className="w-3.5 h-3.5 text-[#f1aa49] shrink-0" />
+              <span>Mela Map</span>
             </button>
-          ) : (
+
             <button
-              onClick={() => engineRef.current?.startGrandFinale()}
-              className="px-4 py-2 text-xs font-semibold text-[#121726] bg-[#f1aa49] rounded-lg hover:bg-[#ffbe61] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              onClick={() => {
+                setMenuOpen(false);
+                setRadioOpen((prev) => !prev);
+              }}
+              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-white/10 text-left transition-colors cursor-pointer"
             >
-              1008 Akashdeep Finale ✦
+              <Music className="w-3.5 h-3.5 text-[#f1aa49] shrink-0" />
+              <span>Bhajans &amp; Radio</span>
             </button>
-          )}
-        </div>
-      </header>
+
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                setBagOpen(true);
+              }}
+              className="flex items-center justify-between w-full px-3 py-2 rounded-xl hover:bg-white/10 text-left transition-colors cursor-pointer"
+            >
+              <span className="flex items-center gap-2.5">
+                <ShoppingBag className="w-3.5 h-3.5 text-[#f1aa49] shrink-0" />
+                <span>Mela Bag</span>
+              </span>
+              <span className="px-1.5 py-0.5 rounded-md bg-[#f1aa49]/20 text-[10px] font-mono-num text-[#ffd27d]">
+                {stats.items.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                if (mode === 'welcome') {
+                  engineRef.current?.enterMela('rangoli-art');
+                } else {
+                  engineRef.current?.teleportTo('rangoli-art');
+                }
+              }}
+              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-white/10 text-left transition-colors cursor-pointer"
+            >
+              <Palette className="w-3.5 h-3.5 text-[#f1aa49] shrink-0" />
+              <span>Rangoli Floor Art</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                setStallModal('create');
+              }}
+              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-white/10 text-left transition-colors cursor-pointer"
+            >
+              <Store className="w-3.5 h-3.5 text-[#f1aa49] shrink-0" />
+              <span>Promote Your Shop</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                setSupportOpen(true);
+              }}
+              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-white/10 text-left text-[#ffd98e] transition-colors cursor-pointer"
+            >
+              <Heart className="w-3.5 h-3.5 text-[#ff6b8b] shrink-0" />
+              <span>Seva Daan Peti QR</span>
+            </button>
+
+            <div className="my-1 border-t border-[#f1aa49]/20" />
+
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                handleNavigateSeoSlug('/', true);
+              }}
+              className="flex items-center gap-2.5 w-full px-3 py-1.5 rounded-xl hover:bg-white/10 text-left text-[11px] text-[#d8c39e] hover:text-white transition-colors cursor-pointer"
+            >
+              <HelpCircle className="w-3.5 h-3.5 text-[#f1aa49] shrink-0" />
+              <span>Diwali 2026 Guide &amp; Wishes</span>
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* WELCOME / ENTRY SCREEN (Matches mela-chaloge.vercel.app layout & poetry for Diwali) */}
       {mode === 'welcome' && (
         <main
-          className="fixed inset-0 z-10 flex flex-col justify-between pt-20 pb-8 px-6 sm:px-14 pointer-events-none"
+          className="fixed inset-0 z-10 flex flex-col justify-between pt-6 pb-8 px-6 sm:px-14 pointer-events-none"
           style={{
             background:
               'linear-gradient(90deg, rgba(11, 20, 35, 0.90) 0%, rgba(11, 20, 35, 0.62) 52%, rgba(11, 20, 35, 0.08) 85%), linear-gradient(0deg, rgba(11, 18, 32, 0.82) 0%, transparent 38%)',
           }}
         >
-          {/* Welcome Top Strip */}
-          <div className="flex items-center justify-between text-xs tracking-widest text-[#e2c395]">
+          {/* Welcome Top Strip (padded on right for Diya Menu pill) */}
+          <div className="flex items-center justify-between pr-28 text-xs tracking-widest text-[#e2c395]">
             <span className="text-sm sm:text-base font-medium tracking-wide text-[#f6dec0]">
               एक शाम, बचपन के नाम
             </span>
-            <span>DIWALI 2026 · शुभ दीपावली</span>
+            <span className="hidden sm:inline">DIWALI 2026 · शुभ दीपावली</span>
           </div>
+
 
           {/* Left Editorial Hero Copy */}
           <div className="max-w-xl my-auto pointer-events-auto">
@@ -593,13 +679,14 @@ export default function App() {
         </main>
       )}
 
-      {/* IN-MELA LOCATION INDICATOR & MINI-MAP (Top-Left below header) */}
+      {/* IN-MELA LOCATION INDICATOR & MINI-MAP (Top-Left) */}
       {(mode === 'walk' || mode === 'entering') && (
-        <div className="fixed top-16 left-4 z-20 flex flex-col gap-2 pointer-events-auto">
+        <div className="fixed top-3.5 left-4 z-20 flex flex-col gap-2 pointer-events-auto">
           {/* Current Zone Indicator */}
-          <div className="px-3.5 py-1.5 rounded-lg bg-[#10182b]/95 border border-[#f1aa49]/30 text-xs font-medium text-[#f5e4c3] shadow-lg">
+          <div className="px-3 py-1.5 rounded-full bg-[#0d1322]/60 backdrop-blur-md border border-[#f1aa49]/35 text-[11px] font-medium text-[#f5e4c3] shadow-lg">
             Location: <strong className="text-[#f1aa49]">{currentZoneLabel}</strong>
           </div>
+
 
           {/* Collapsible Interactive Mini-Map */}
           <div className="rounded-xl bg-[#10182b]/95 border border-[#f1aa49]/35 overflow-hidden shadow-xl w-56">
@@ -834,8 +921,9 @@ export default function App() {
           mode === 'diya-game' ||
           mode === 'rangoli' ||
           mode === 'well') && (
-          <div className="fixed top-16 left-1/2 -translate-x-1/2 z-20 w-[94vw] max-w-xl pointer-events-auto">
-            <div className="rounded-2xl bg-[#10182b]/95 border border-[#f1aa49]/50 p-4 shadow-2xl text-center">
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-20 w-[94vw] max-w-xl pointer-events-auto">
+            <div className="rounded-2xl bg-[#10182b]/90 backdrop-blur-md border border-[#f1aa49]/50 p-4 shadow-2xl text-center">
+
               <div className="flex items-center justify-between text-xs font-semibold text-[#f1aa49] mb-1">
                 <span>
                   {gameHud.mode === 'balloon'
@@ -1006,8 +1094,9 @@ export default function App() {
 
       {/* ACTIVE RIDE / STAGE / FIREWORKS SHOW PROGRESS BAR */}
       {(mode === 'ride' || mode === 'firework-show' || mode === 'stage') && rideProgress && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-20 w-[90vw] max-w-md pointer-events-auto">
-          <div className="rounded-2xl bg-[#10182b]/95 border border-[#f1aa49]/45 p-4 shadow-2xl text-center">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-20 w-[90vw] max-w-md pointer-events-auto">
+          <div className="rounded-2xl bg-[#10182b]/90 backdrop-blur-md border border-[#f1aa49]/45 p-4 shadow-2xl text-center">
+
             <div className="text-xs font-semibold tracking-wider text-[#f1aa49] mb-1">
               {mode === 'stage'
                 ? 'AYODHYA DEEPOTSAV & RAM LEELA STAGE'
