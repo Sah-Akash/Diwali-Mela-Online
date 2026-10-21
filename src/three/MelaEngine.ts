@@ -105,6 +105,28 @@ interface SkyLanternInstance {
   scale: number;
 }
 
+interface MelaCrowdVisitor {
+  group: THREE.Group;
+  bodyGroup: THREE.Group;
+  head: THREE.Object3D;
+  leftLeg: THREE.Object3D;
+  rightLeg: THREE.Object3D;
+  leftArm: THREE.Object3D;
+  rightArm: THREE.Object3D;
+  greetingSprite: THREE.Sprite;
+  role: 'roaming' | 'sitting' | 'standing';
+  name: string;
+  greetingText: string;
+  voiceLine: string;
+  walkSpeed: number;
+  waypoints: { x: number; z: number }[];
+  currentWaypoint: number;
+  baseYaw: number;
+  phase: number;
+  waveTimer: number;
+}
+
+
 export class MelaEngine {
   private host: HTMLElement;
   private callbacks: MelaEngineCallbacks;
@@ -183,6 +205,10 @@ export class MelaEngine {
   private rangoliBowls: { mesh: THREE.Object3D; hex: string; name: string }[] = [];
   public selectedRangoliColor: string = RANGOLI_COLORS[0].hex;
   public rangoliSymmetry = true;
+
+  // Mela Crowd Visitors (roaming, sitting & eating, standing at shops)
+  private crowdVisitors: MelaCrowdVisitor[] = [];
+
 
   // Activity / Cinematic timers
   private entryStartTime = 0;
@@ -599,6 +625,8 @@ export class MelaEngine {
     this.rangoliSegments = [];
     this.rangoliBowls = [];
     this.rangoliGroup = null;
+    this.crowdVisitors = [];
+
 
     for (const spec of this.interactables) {
       switch (spec.type) {
@@ -649,7 +677,11 @@ export class MelaEngine {
           break;
       }
     }
+
+    // Populate the fairground with lively crowds: roaming families, people sitting & eating chaat/jalebi, and shoppers standing at stalls
+    this.buildMelaCrowdsAndTables();
   }
+
 
   private createClayDiyaMesh(scale = 1, lit = true): { group: THREE.Group; flame: THREE.Object3D } {
     const group = new THREE.Group();
@@ -1970,10 +2002,13 @@ export class MelaEngine {
           this.handleRangoliTap(e.clientX, e.clientY);
         } else if (this.mode === 'walk') {
           if (!this.checkDaanPetiClick(e.clientX, e.clientY)) {
-            this.checkRangoliClick(e.clientX, e.clientY);
+            if (!this.checkRangoliClick(e.clientX, e.clientY)) {
+              this.checkCrowdClick(e.clientX, e.clientY);
+            }
           }
         }
       } else if (this.mode === 'ring' && dragDy > 24) {
+
         this.handleRingToss(e.clientX, e.clientY);
       }
     };
@@ -2662,6 +2697,10 @@ export class MelaEngine {
       }
     }
 
+    // 6b. Mela Crowd Visitors (roaming, sitting & eating, standing at shops, and greeting waves)
+    this.updateCrowdAnimations(dt);
+
+
     // 7. Ring Toss flight animation
     if (this.ringFlight && this.ringFlight.active) {
       this.ringFlight.t += dt * 2.2;
@@ -3072,6 +3111,1114 @@ export class MelaEngine {
     this.lanternMesh.instanceMatrix.needsUpdate = true;
   }
 
+  // --- MELA CROWD VISITORS (ROAMING, SITTING & EATING, STANDING AT SHOPS) ---
+
+  private createGreetingBubbleSprite(visitorName: string, greetingText: string): THREE.Sprite {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 192;
+    const ctx = canvas.getContext('2d')!;
+
+    // Festive dark-maroon & gold pill speech bubble
+    ctx.clearRect(0, 0, 512, 192);
+    ctx.fillStyle = 'rgba(28, 12, 24, 0.94)';
+    ctx.strokeStyle = '#ffbe42';
+    ctx.lineWidth = 6;
+
+    const r = 32;
+    const bx = 16;
+    const by = 14;
+    const bw = 480;
+    const bh = 134;
+
+    ctx.beginPath();
+    ctx.moveTo(bx + r, by);
+    ctx.lineTo(bx + bw - r, by);
+    ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + r);
+    ctx.lineTo(bx + bw, by + bh - r);
+    ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - r, by + bh);
+    // Speech pointer triangle at bottom center
+    ctx.lineTo(276, by + bh);
+    ctx.lineTo(256, by + bh + 28);
+    ctx.lineTo(236, by + bh);
+    ctx.lineTo(bx + r, by + bh);
+    ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - r);
+    ctx.lineTo(bx, by + r);
+    ctx.quadraticCurveTo(bx, by, bx + r, by);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Visitor Name & Happy Diwali headline
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd666';
+    ctx.font = 'bold 26px sans-serif';
+    ctx.fillText(`🪔 ${visitorName}: Happy Diwali! ✨`, 256, 62);
+
+    ctx.fillStyle = '#fff5dc';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillText(greetingText, 256, 108);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(2.4, 0.9, 1);
+    sprite.renderOrder = 25;
+    sprite.visible = false;
+    return sprite;
+  }
+
+  private createVisitorCharacterMesh(opts: {
+    outfitColor: number;
+    secondaryColor: number;
+    skinColor?: number;
+    style: 'kurta' | 'saree' | 'child';
+    hasTurban?: boolean;
+    hasBalloon?: boolean;
+    balloonColor?: number;
+    hasSparkler?: boolean;
+    hasFoodItem?: 'jalebi' | 'chaat' | 'chai';
+    sitting?: boolean;
+    name: string;
+    greetingText: string;
+  }): {
+    group: THREE.Group;
+    bodyGroup: THREE.Group;
+    head: THREE.Object3D;
+    leftLeg: THREE.Object3D;
+    rightLeg: THREE.Object3D;
+    leftArm: THREE.Object3D;
+    rightArm: THREE.Object3D;
+    greetingSprite: THREE.Sprite;
+  } {
+    const group = new THREE.Group();
+    const bodyGroup = new THREE.Group();
+    group.add(bodyGroup);
+
+    const isChild = opts.style === 'child';
+    const scale = isChild ? 0.74 : 1.0;
+    bodyGroup.scale.set(scale, scale, scale);
+
+    const skinMat = new THREE.MeshStandardMaterial({
+      color: opts.skinColor ?? 0xd99b72,
+      roughness: 0.65,
+    });
+    const outfitMat = new THREE.MeshStandardMaterial({
+      color: opts.outfitColor,
+      roughness: 0.5,
+      metalness: 0.12,
+    });
+    const secMat = new THREE.MeshStandardMaterial({
+      color: opts.secondaryColor,
+      roughness: 0.42,
+      metalness: 0.25,
+    });
+    const goldMat = new THREE.MeshStandardMaterial({
+      color: 0xffc857,
+      roughness: 0.3,
+      metalness: 0.8,
+    });
+    const darkHairMat = new THREE.MeshStandardMaterial({
+      color: 0x1b1210,
+      roughness: 0.8,
+    });
+    const shoeMat = new THREE.MeshStandardMaterial({
+      color: 0x4a2511,
+      roughness: 0.7,
+    });
+
+    // Legs (with pivot at hip y = 0.68 for walking or sitting)
+    const leftLeg = new THREE.Group();
+    const rightLeg = new THREE.Group();
+    leftLeg.position.set(-0.13, 0.68, 0);
+    rightLeg.position.set(0.13, 0.68, 0);
+
+    const legMat = opts.style === 'saree' ? outfitMat : secMat;
+    const leftLegMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.075, 0.64, 10), legMat);
+    leftLegMesh.position.y = -0.32;
+    const leftShoe = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.24), shoeMat);
+    leftShoe.position.set(0, -0.62, 0.04);
+    leftLeg.add(leftLegMesh, leftShoe);
+
+    const rightLegMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.075, 0.64, 10), legMat);
+    rightLegMesh.position.y = -0.32;
+    const rightShoe = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.24), shoeMat);
+    rightShoe.position.set(0, -0.62, 0.04);
+    rightLeg.add(rightLegMesh, rightShoe);
+
+    if (opts.sitting) {
+      leftLeg.rotation.x = -Math.PI / 2.2;
+      rightLeg.rotation.x = -Math.PI / 2.2;
+      bodyGroup.position.y = -0.26;
+    }
+    bodyGroup.add(leftLeg, rightLeg);
+
+    // Torso (Kurta or Saree/Lehenga flare)
+    if (opts.style === 'saree') {
+      const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.34, 0.78, 14), outfitMat);
+      skirt.position.y = 0.76;
+      const bodice = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.19, 0.44, 14), secMat);
+      bodice.position.y = 1.24;
+      // Golden saree pallu / dupatta drape
+      const pallu = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.56, 0.28), goldMat);
+      pallu.position.set(0.02, 1.16, 0);
+      pallu.rotation.z = 0.24;
+      bodyGroup.add(skirt, bodice, pallu);
+    } else {
+      const kurta = new THREE.Mesh(new THREE.CylinderGeometry(0.23, 0.28, 0.82, 14), outfitMat);
+      kurta.position.y = 1.02;
+      // Festive Nehru vest / golden collar border
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.14, 12), goldMat);
+      collar.position.y = 1.38;
+      const stole = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.68, 0.34), secMat);
+      stole.position.set(0.12, 1.08, 0.02);
+      bodyGroup.add(kurta, collar, stole);
+    }
+
+    // Head & Hair / Turban
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 1.66, 0);
+    const headSphere = new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 14), skinMat);
+    headGroup.add(headSphere);
+
+    // Eyes & Smile
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x160d08 });
+    const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.026, 8, 8), eyeMat);
+    leftEye.position.set(-0.07, 0.03, 0.19);
+    const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.026, 8, 8), eyeMat);
+    rightEye.position.set(0.07, 0.03, 0.19);
+    headGroup.add(leftEye, rightEye);
+
+    // Red/Gold Bindi or Tilak on forehead
+    const tilakMat = new THREE.MeshBasicMaterial({ color: 0xff2a4b });
+    const tilak = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), tilakMat);
+    tilak.position.set(0, 0.09, 0.2);
+    headGroup.add(tilak);
+
+    if (opts.hasTurban) {
+      const turban = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.085, 10, 16), secMat);
+      turban.rotation.x = Math.PI / 2 - 0.15;
+      turban.position.y = 0.11;
+      const kalgi = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.18, 8), goldMat);
+      kalgi.position.set(0, 0.24, 0.14);
+      headGroup.add(turban, kalgi);
+    } else {
+      const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 12, 0, Math.PI * 2, 0, Math.PI * 0.58), darkHairMat);
+      hairCap.position.y = 0.02;
+      hairCap.rotation.x = -0.18;
+      headGroup.add(hairCap);
+      if (opts.style === 'saree') {
+        // Festive hair bun with gajra flowers
+        const bun = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 10), darkHairMat);
+        bun.position.set(0, 0.02, -0.22);
+        const gajra = new THREE.Mesh(
+          new THREE.TorusGeometry(0.095, 0.025, 8, 12),
+          new THREE.MeshBasicMaterial({ color: 0xfff7d6 })
+        );
+        gajra.position.set(0, 0.02, -0.2);
+        headGroup.add(bun, gajra);
+      }
+    }
+    bodyGroup.add(headGroup);
+
+    // Arms (pivot at shoulder y = 1.36)
+    const leftArm = new THREE.Group();
+    const rightArm = new THREE.Group();
+    leftArm.position.set(-0.29, 1.36, 0);
+    rightArm.position.set(0.29, 1.36, 0);
+
+    const leftArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.52, 10), outfitMat);
+    leftArmMesh.position.y = -0.24;
+    const leftHand = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), skinMat);
+    leftHand.position.y = -0.5;
+    leftArm.add(leftArmMesh, leftHand);
+
+    const rightArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.52, 10), outfitMat);
+    rightArmMesh.position.y = -0.24;
+    const rightHand = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 8), skinMat);
+    rightHand.position.y = -0.5;
+    rightArm.add(rightArmMesh, rightHand);
+
+    // Optional props held in hand
+    if (opts.hasBalloon) {
+      const stringMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.008, 0.008, 0.95, 6),
+        new THREE.MeshBasicMaterial({ color: 0xfff0cc })
+      );
+      stringMesh.position.set(0, 0.05, 0.12);
+      const balloonMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.24, 12, 12),
+        new THREE.MeshStandardMaterial({
+          color: opts.balloonColor ?? 0xff3b6b,
+          roughness: 0.2,
+          metalness: 0.1,
+          emissive: opts.balloonColor ?? 0xff3b6b,
+          emissiveIntensity: 0.25,
+        })
+      );
+      balloonMesh.scale.y = 1.18;
+      balloonMesh.position.set(0, 0.58, 0.12);
+      leftArm.add(stringMesh, balloonMesh);
+      leftArm.rotation.x = -0.55;
+    }
+
+    if (opts.hasSparkler) {
+      const wire = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.012, 0.012, 0.45, 6),
+        new THREE.MeshBasicMaterial({ color: 0xdddddd })
+      );
+      wire.position.set(0, -0.55, 0.18);
+      wire.rotation.x = Math.PI / 3;
+      const sparkGlow = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: this.glowTexture,
+          color: 0xffe484,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+        })
+      );
+      sparkGlow.scale.set(0.55, 0.55, 0.55);
+      sparkGlow.position.set(0, -0.68, 0.35);
+      rightArm.add(wire, sparkGlow);
+      rightArm.rotation.x = -0.7;
+    }
+
+    if (opts.hasFoodItem) {
+      if (opts.hasFoodItem === 'chai') {
+        const kulhad = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.055, 0.04, 0.11, 10),
+          new THREE.MeshStandardMaterial({ color: 0xb8532a, roughness: 0.8 })
+        );
+        kulhad.position.set(0, -0.52, 0.08);
+        rightArm.add(kulhad);
+      } else if (opts.hasFoodItem === 'jalebi') {
+        const jalebiPiece = new THREE.Mesh(
+          new THREE.TorusGeometry(0.05, 0.018, 8, 14),
+          new THREE.MeshStandardMaterial({
+            color: 0xff7b00,
+            emissive: 0xff5500,
+            emissiveIntensity: 0.3,
+            roughness: 0.3,
+          })
+        );
+        jalebiPiece.position.set(0, -0.52, 0.08);
+        rightArm.add(jalebiPiece);
+      } else {
+        const chaatDona = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.07, 0.04, 0.06, 10),
+          new THREE.MeshStandardMaterial({ color: 0xd9b382, roughness: 0.8 })
+        );
+        chaatDona.position.set(0, -0.52, 0.08);
+        leftArm.add(chaatDona);
+        leftArm.rotation.x = -0.75;
+      }
+    }
+
+    bodyGroup.add(leftArm, rightArm);
+
+    // Invisible click hitbox so tapping any person is effortless on mobile & desktop
+    const hitbox = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.55, 0.55, 2.2, 8),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    hitbox.position.y = 1.05;
+    group.add(hitbox);
+
+    // Overhead Happy Diwali Speech Bubble Sprite (shown when clicked!)
+    const greetingSprite = this.createGreetingBubbleSprite(opts.name, opts.greetingText);
+    greetingSprite.position.set(0, 2.45 * scale, 0);
+    group.add(greetingSprite);
+
+    this.addContactShadow(group, 1.15 * scale, 1.15 * scale);
+
+    return {
+      group,
+      bodyGroup,
+      head: headGroup,
+      leftLeg,
+      rightLeg,
+      leftArm,
+      rightArm,
+      greetingSprite,
+    };
+  }
+
+  private buildMelaDiningTable(
+    cx: number,
+    cz: number,
+    tableTitle: string,
+    diners: {
+      name: string;
+      outfitColor: number;
+      secondaryColor: number;
+      style: 'kurta' | 'saree' | 'child';
+      hasTurban?: boolean;
+      food: 'jalebi' | 'chaat' | 'chai';
+      greetingText: string;
+      voiceLine: string;
+    }[]
+  ): void {
+    const tableGroup = new THREE.Group();
+    tableGroup.position.set(cx, 0, cz);
+
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c3218, roughness: 0.78 });
+    const clothMat = new THREE.MeshStandardMaterial({ color: 0x9e1b32, roughness: 0.6 });
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xf4b855, roughness: 0.35, metalness: 0.75 });
+    const jalebiMat = new THREE.MeshStandardMaterial({
+      color: 0xff7700,
+      emissive: 0xff4400,
+      emissiveIntensity: 0.25,
+      roughness: 0.3,
+    });
+    const clayMat = new THREE.MeshStandardMaterial({ color: 0xb85228, roughness: 0.75 });
+
+    // Wooden Tabletop (2.4m wide x 1.1m deep)
+    const top = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.1, 1.15), woodMat);
+    top.position.y = 0.78;
+    const runner = new THREE.Mesh(new THREE.BoxGeometry(2.54, 0.11, 0.46), clothMat);
+    runner.position.y = 0.785;
+    tableGroup.add(top, runner);
+
+    // 4 Table Legs
+    for (const lx of [-1.05, 1.05]) {
+      for (const lz of [-0.42, 0.42]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.78, 8), woodMat);
+        leg.position.set(lx, 0.39, lz);
+        tableGroup.add(leg);
+      }
+    }
+
+    // 2 Wooden Benches (North & South sides of table)
+    for (const bz of [-0.88, 0.88]) {
+      const bench = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.08, 0.42), woodMat);
+      bench.position.set(0, 0.45, bz);
+      const bLeg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.45, 8), woodMat);
+      bLeg1.position.set(-0.9, 0.225, bz);
+      const bLeg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.45, 8), woodMat);
+      bLeg2.position.set(0.9, 0.225, bz);
+      tableGroup.add(bench, bLeg1, bLeg2);
+    }
+
+    // Centerpiece Clay Diya on table + 4 Brass Thalis of Jalebi, Samosa Chaat & Kulhad Chai
+    const centerDiya = this.createClayDiyaMesh(0.55, true);
+    centerDiya.group.position.set(0, 0.84, 0);
+    tableGroup.add(centerDiya.group);
+    this.flameMeshes.push(centerDiya.flame);
+
+    const seatPositions = [
+      { x: -0.62, z: -0.88, plateZ: -0.32, yaw: 0 },
+      { x: 0.62, z: -0.88, plateZ: -0.32, yaw: 0 },
+      { x: -0.62, z: 0.88, plateZ: 0.32, yaw: Math.PI },
+      { x: 0.62, z: 0.88, plateZ: 0.32, yaw: Math.PI },
+    ];
+
+    for (let i = 0; i < Math.min(diners.length, 4); i++) {
+      const seat = seatPositions[i];
+      const dSpec = diners[i];
+
+      // Brass plate (thali) with jalebis and kulhad on the tabletop in front of the diner
+      const thali = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.18, 0.03, 14), goldMat);
+      thali.position.set(seat.x, 0.85, seat.plateZ);
+      const jalebi1 = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.018, 8, 12), jalebiMat);
+      jalebi1.rotation.x = Math.PI / 2;
+      jalebi1.position.set(seat.x - 0.05, 0.88, seat.plateZ);
+      const jalebi2 = new THREE.Mesh(new THREE.TorusGeometry(0.048, 0.016, 8, 12), jalebiMat);
+      jalebi2.rotation.x = Math.PI / 2;
+      jalebi2.position.set(seat.x + 0.06, 0.88, seat.plateZ + 0.03);
+      const kulhad = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.038, 0.1, 10), clayMat);
+      kulhad.position.set(seat.x + 0.24, 0.89, seat.plateZ);
+      tableGroup.add(thali, jalebi1, jalebi2, kulhad);
+
+      // Seated Visitor Mesh
+      const char = this.createVisitorCharacterMesh({
+        outfitColor: dSpec.outfitColor,
+        secondaryColor: dSpec.secondaryColor,
+        style: dSpec.style,
+        hasTurban: dSpec.hasTurban,
+        hasFoodItem: dSpec.food,
+        sitting: true,
+        name: dSpec.name,
+        greetingText: dSpec.greetingText,
+      });
+      char.group.position.set(cx + seat.x, 0, cz + seat.z);
+      char.group.rotation.y = seat.yaw;
+      this.dynamicRoot.add(char.group);
+
+      this.crowdVisitors.push({
+        ...char,
+        role: 'sitting',
+        name: dSpec.name,
+        greetingText: dSpec.greetingText,
+        voiceLine: dSpec.voiceLine,
+        walkSpeed: 0,
+        waypoints: [],
+        currentWaypoint: 0,
+        baseYaw: seat.yaw,
+        phase: i * 1.7 + cx,
+        waveTimer: 0,
+      });
+    }
+
+    // Small festive table placard
+    const signTex = createSignboardTexture(
+      this.renderer,
+      tableTitle,
+      'Mithai & Chaat Sit-Out · Click Diners to Greet!',
+      '#4a1222',
+      '#ffcf66',
+      '#fff6dc'
+    );
+    const signBoard = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.5, 0.36),
+      new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide })
+    );
+
+    signBoard.position.set(0, 1.38, 0);
+    tableGroup.add(signBoard);
+
+    this.addContactShadow(tableGroup, 3.2, 2.4);
+    this.dynamicRoot.add(tableGroup);
+  }
+
+  private buildMelaCrowdsAndTables(): void {
+    // 1. SITTING & EATING VISITORS (2 Festive Chaat & Jalebi Dining Tables with 8 Seated Diners)
+    this.buildMelaDiningTable(-5.2, 24.2, 'गर्मा-गर्म जलेबी एवं चाट चौपाल', [
+      {
+        name: 'Sharma Ji',
+        outfitColor: 0xd9531e,
+        secondaryColor: 0xffe082,
+        style: 'kurta',
+        hasTurban: true,
+        food: 'jalebi',
+        greetingText: 'शुभ दीपावली! गर्मा-गर्म केसर जलेबी खाइए!',
+        voiceLine: 'Happy Diwali! Shubh Deepavali! Aaiye garma garam kesar jalebi khaiye!',
+      },
+      {
+        name: 'Sunita Aunty',
+        outfitColor: 0xc2185b,
+        secondaryColor: 0xffca28,
+        style: 'saree',
+        food: 'chai',
+        greetingText: 'Happy Diwali Beta! Maa Lakshmi bless your home!',
+        voiceLine: 'Happy Diwali beta! May Maa Lakshmi fill your home with happiness and prosperity!',
+      },
+      {
+        name: 'Rohan',
+        outfitColor: 0x1976d2,
+        secondaryColor: 0xffb300,
+        style: 'kurta',
+        food: 'chaat',
+        greetingText: 'Happy Diwali! Mela ki golgappa chaat lajawab hai!',
+        voiceLine: 'Happy Diwali bro! The Banarasi chaat here at Diwali Mela is amazing!',
+      },
+      {
+        name: 'Chintu',
+        outfitColor: 0x00897b,
+        secondaryColor: 0xffd54f,
+        style: 'child',
+        food: 'jalebi',
+        greetingText: 'Happy Diwali! मुझे जलेबी और पटाखे बहुत पसंद हैं!',
+        voiceLine: 'Happy Diwali! I love sweet jalebis and sparkling phuljharis!',
+      },
+    ]);
+
+    this.buildMelaDiningTable(5.2, 12.2, 'बनारसी चाट एवं कुल्हड़ चाय बैठक', [
+      {
+        name: 'Verma Uncle',
+        outfitColor: 0x6a1b9a,
+        secondaryColor: 0xffd54f,
+        style: 'kurta',
+        hasTurban: true,
+        food: 'chai',
+        greetingText: 'शुभ दीपावली! कुल्हड़ वाली मसाला चाय की बात ही अलग है!',
+        voiceLine: 'Shubh Deepavali! Nothing beats hot kulhad masala chai at the Diwali Mela!',
+      },
+      {
+        name: 'Meera Didi',
+        outfitColor: 0xe64a19,
+        secondaryColor: 0xfff176,
+        style: 'saree',
+        food: 'chaat',
+        greetingText: 'Happy Diwali! आपको और आपके परिवार को ढेर सारी शुभकामनाएं!',
+        voiceLine: 'Happy Diwali to you and your entire family! Have a bright and joyful festival!',
+      },
+      {
+        name: 'Kabir',
+        outfitColor: 0x2e7d32,
+        secondaryColor: 0xffc107,
+        style: 'kurta',
+        food: 'jalebi',
+        greetingText: 'Happy Diwali Dost! Mela ghoom ke maza aa gaya!',
+        voiceLine: 'Happy Diwali my friend! Exploring this 3D Diwali Mela is so much fun!',
+      },
+      {
+        name: 'Pinky',
+        outfitColor: 0xd81b60,
+        secondaryColor: 0xffe082,
+        style: 'child',
+        food: 'chai',
+        greetingText: 'Happy Diwali! दीपावली की हार्दिक शुभकामनाएं! 🪔',
+        voiceLine: 'Happy Diwali! Wishing you lots of sweets, diyas, and happiness!',
+      },
+    ]);
+
+    // 2. STANDING IN FRONT OF SHOPS & ATTRACTIONS (12 Shoppers admiring stalls & chatting)
+    const shopStanders: {
+      name: string;
+      x: number;
+      z: number;
+      yaw: number;
+      outfitColor: number;
+      secondaryColor: number;
+      style: 'kurta' | 'saree' | 'child';
+      hasTurban?: boolean;
+      hasBalloon?: boolean;
+      balloonColor?: number;
+      hasSparkler?: boolean;
+      greetingText: string;
+      voiceLine: string;
+    }[] = [
+      // Standing in front of Halwai Mithai Ghar (-10.5, 30)
+      {
+        name: 'Gupta Ji',
+        x: -7.2,
+        z: 30.8,
+        yaw: -Math.PI / 2,
+        outfitColor: 0xb71c1c,
+        secondaryColor: 0xffd54f,
+        style: 'kurta',
+        hasTurban: true,
+        greetingText: 'शुभ दीपावली! काजू कतली और लड्डू पैक करवा रहा हूँ!',
+        voiceLine: 'Happy Diwali! Getting fresh Kaju Katli and Motichoor Laddoos for the family!',
+      },
+      {
+        name: 'Neha',
+        x: -7.0,
+        z: 29.2,
+        yaw: -Math.PI / 2 + 0.25,
+        outfitColor: 0xad1457,
+        secondaryColor: 0xffca28,
+        style: 'saree',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali! मुंह मीठा कीजिए, त्योहार का दिन है!',
+        voiceLine: 'Happy Diwali! Have some festive sweets, it is the festival of lights!',
+      },
+      // Standing in front of Kesar Jalebi Darbar (10.5, 30)
+      {
+        name: 'Rajesh Bhaiya',
+        x: 7.2,
+        z: 29.6,
+        yaw: Math.PI / 2,
+        outfitColor: 0x0d47a1,
+        secondaryColor: 0xffb300,
+        style: 'kurta',
+        greetingText: 'Happy Diwali! चाशनी वाली कुरकुरी जलेबी की खुशबू लाजवाब है!',
+        voiceLine: 'Happy Diwali! The aroma of hot saffron jalebis is irresistible!',
+      },
+      // Standing in front of Banarasi Chaat Corner (-10.5, 18)
+      {
+        name: 'Priya',
+        x: -7.1,
+        z: 18.4,
+        yaw: -Math.PI / 2,
+        outfitColor: 0x8e24aa,
+        secondaryColor: 0xffe082,
+        style: 'saree',
+        greetingText: 'Happy Diwali! भैया थोड़े और तीखे गोलगप्पे खिलाना!',
+        voiceLine: 'Happy Diwali! Wishing you a sparkling and delicious Deepavali celebration!',
+      },
+      // Standing in front of Khilona Sansar Toys (10.5, 18)
+      {
+        name: 'Aarav',
+        x: 7.1,
+        z: 18.6,
+        yaw: Math.PI / 2,
+        outfitColor: 0x00acc1,
+        secondaryColor: 0xffd54f,
+        style: 'child',
+        hasBalloon: true,
+        balloonColor: 0xff4081,
+        greetingText: 'Happy Diwali! देखो मेरे पास मेले का गुब्बारा है! 🎈',
+        voiceLine: 'Happy Diwali! Look at my shiny mela balloon and toys!',
+      },
+      {
+        name: 'Vikram',
+        x: 7.3,
+        z: 17.5,
+        yaw: Math.PI / 2 - 0.2,
+        outfitColor: 0xef6c00,
+        secondaryColor: 0xfff59d,
+        style: 'kurta',
+        greetingText: 'शुभ दीपावली! बच्चों के लिए लकड़ी के खिलौने ले रहा हूँ!',
+        voiceLine: 'Shubh Deepavali! Buying traditional wooden toys for the kids!',
+      },
+      // Standing in front of Terracotta Diya Craft (-10.5, 6)
+      {
+        name: 'Kavita Ji',
+        x: -7.2,
+        z: 6.3,
+        yaw: -Math.PI / 2,
+        outfitColor: 0xd84315,
+        secondaryColor: 0xffcc80,
+        style: 'saree',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali! मिट्टी के दीयों से घर आँगन जगमगाएगा!',
+        voiceLine: 'Happy Diwali! Handcrafted clay diyas bring true warmth to every home!',
+      },
+      // Standing in front of Balloon Shooting Game (10.5, 6)
+      {
+        name: 'Siddharth',
+        x: 7.2,
+        z: 5.8,
+        yaw: Math.PI / 2,
+        outfitColor: 0x283593,
+        secondaryColor: 0xffca28,
+        style: 'kurta',
+        greetingText: 'Happy Diwali! गुब्बारे फोड़ने में किसका निशाना सबसे पक्का है?',
+        voiceLine: 'Happy Diwali! Let us see who gets the highest score in Gubbara Nishana!',
+      },
+      // Standing in front of Ring Toss Stall (-10.5, -6)
+      {
+        name: 'Ananya',
+        x: -7.2,
+        z: -5.8,
+        yaw: -Math.PI / 2,
+        outfitColor: 0xc2185b,
+        secondaryColor: 0xffe082,
+        style: 'saree',
+        hasBalloon: true,
+        balloonColor: 0xffab00,
+        greetingText: 'Happy Diwali! रिंग टॉस खेलकर मैंने ट्रॉफी जीती!',
+        voiceLine: 'Happy Diwali! Try the ring toss game, it is super fun!',
+      },
+      // Standing near 7 Diyas Mandap & Seva Daan Peti (x: 2.8, z: -6.2)
+      {
+        name: 'Pandit Dinanath',
+        x: 3.2,
+        z: -6.2,
+        yaw: -0.6,
+        outfitColor: 0xff6f00,
+        secondaryColor: 0xfff8e1,
+        style: 'kurta',
+        hasTurban: true,
+        greetingText: 'शुभ दीपावली! ७ शुभ दीप जलाएं और सेवा दान पेटी में पुण्य कमाएं!',
+        voiceLine: 'Shubh Deepavali! May the seven auspicious diyas bring peace, health, and abundance to all!',
+      },
+      // Standing near Rangoli Aangan (x: -4.2, z: -6.2)
+      {
+        name: 'Divya',
+        x: -4.2,
+        z: -6.2,
+        yaw: 0.7,
+        outfitColor: 0x7b1fa2,
+        secondaryColor: 0xffd54f,
+        style: 'saree',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali! आओ मिलकर आँगन में सुंदर रंगोली सजाएं!',
+        voiceLine: 'Happy Diwali! Come fill the floor Rangoli with vibrant festive colors!',
+      },
+      // Standing near Ram Leela Cultural Stage (x: -2.4, z: -29.5)
+      {
+        name: 'Dada Ji',
+        x: -2.4,
+        z: -29.5,
+        yaw: Math.PI,
+        outfitColor: 0x8d6e63,
+        secondaryColor: 0xffe082,
+        style: 'kurta',
+        hasTurban: true,
+        greetingText: 'जय श्री राम! शुभ दीपावली! अयोध्या में श्री राम के आगमन का उत्सव!',
+        voiceLine: 'Jai Shri Ram! Shubh Deepavali! Rejoice in the grand return of Lord Rama!',
+      },
+    ];
+
+    for (let i = 0; i < shopStanders.length; i++) {
+      const s = shopStanders[i];
+      const char = this.createVisitorCharacterMesh({
+        outfitColor: s.outfitColor,
+        secondaryColor: s.secondaryColor,
+        style: s.style,
+        hasTurban: s.hasTurban,
+        hasBalloon: s.hasBalloon,
+        balloonColor: s.balloonColor,
+        hasSparkler: s.hasSparkler,
+        name: s.name,
+        greetingText: s.greetingText,
+      });
+      char.group.position.set(s.x, 0, s.z);
+      char.group.rotation.y = s.yaw;
+      this.dynamicRoot.add(char.group);
+
+      this.crowdVisitors.push({
+        ...char,
+        role: 'standing',
+        name: s.name,
+        greetingText: s.greetingText,
+        voiceLine: s.voiceLine,
+        walkSpeed: 0,
+        waypoints: [],
+        currentWaypoint: 0,
+        baseYaw: s.yaw,
+        phase: i * 1.3,
+        waveTimer: 0,
+      });
+    }
+
+    // 3. ROAMING MELA CROWDS (12 Visitors strolling along the bazaar lanes & fairground)
+    const roamers: {
+      name: string;
+      outfitColor: number;
+      secondaryColor: number;
+      style: 'kurta' | 'saree' | 'child';
+      hasTurban?: boolean;
+      hasBalloon?: boolean;
+      balloonColor?: number;
+      hasSparkler?: boolean;
+      walkSpeed: number;
+      waypoints: { x: number; z: number }[];
+      greetingText: string;
+      voiceLine: string;
+    }[] = [
+      {
+        name: 'Arjun',
+        outfitColor: 0xd32f2f,
+        secondaryColor: 0xffe082,
+        style: 'kurta',
+        hasSparkler: true,
+        walkSpeed: 1.55,
+        waypoints: [
+          { x: -2.2, z: 36 },
+          { x: -2.2, z: 14 },
+          { x: -1.8, z: -4 },
+          { x: -2.2, z: 14 },
+        ],
+        greetingText: 'Happy Diwali! मेला चलोगे मेरे साथ? क्या नज़ारा है!',
+        voiceLine: 'Happy Diwali! Welcome to the Diwali Mela, look how bright the lights are tonight!',
+      },
+      {
+        name: 'Pooja',
+        outfitColor: 0xc2185b,
+        secondaryColor: 0xffd54f,
+        style: 'saree',
+        hasSparkler: true,
+        walkSpeed: 1.5,
+        waypoints: [
+          { x: -1.3, z: 35 },
+          { x: -1.3, z: 13 },
+          { x: -1.0, z: -5 },
+          { x: -1.3, z: 13 },
+        ],
+        greetingText: 'शुभ दीपावली! दीपों का यह पावन पर्व आपके जीवन में खुशियां लाए!',
+        voiceLine: 'Shubh Deepavali! May this festival of lights bring endless joy to your life!',
+      },
+      {
+        name: 'Karan',
+        outfitColor: 0x1565c0,
+        secondaryColor: 0xffca28,
+        style: 'kurta',
+        hasTurban: true,
+        walkSpeed: 1.7,
+        waypoints: [
+          { x: 2.1, z: -2 },
+          { x: 2.1, z: 22 },
+          { x: 2.4, z: 38 },
+          { x: 2.1, z: 22 },
+        ],
+        greetingText: 'Happy Diwali! आकाशदीप और आतिशबाज़ी देखकर दिल खुश हो गया!',
+        voiceLine: 'Happy Diwali! Watching the sky lanterns and fireworks is pure magic!',
+      },
+      {
+        name: 'Riya',
+        outfitColor: 0x6a1b9a,
+        secondaryColor: 0xffe082,
+        style: 'saree',
+        hasBalloon: true,
+        balloonColor: 0x00e5ff,
+        walkSpeed: 1.65,
+        waypoints: [
+          { x: 1.2, z: -3 },
+          { x: 1.2, z: 21 },
+          { x: 1.5, z: 37 },
+          { x: 1.2, z: 21 },
+        ],
+        greetingText: 'Happy Diwali! चलो बड़ा झूला और मौत का कुआँ देखने चलते हैं!',
+        voiceLine: 'Happy Diwali! Let us go ride the giant Ferris Wheel and watch the fireworks!',
+      },
+      {
+        name: 'Golu',
+        outfitColor: 0x2e7d32,
+        secondaryColor: 0xfff176,
+        style: 'child',
+        hasBalloon: true,
+        balloonColor: 0xff5252,
+        hasSparkler: true,
+        walkSpeed: 1.95,
+        waypoints: [
+          { x: 0.2, z: 28 },
+          { x: 0.4, z: 8 },
+          { x: -0.4, z: -12 },
+          { x: 0.4, z: 8 },
+        ],
+        greetingText: 'Happy Diwali! मेरी फुलझड़ी देखो कितनी तेज़ चमक रही है! ✨',
+        voiceLine: 'Happy Diwali! Look how brightly my golden phuljhari sparkler is shining!',
+      },
+      {
+        name: 'Bittu',
+        outfitColor: 0xf57c00,
+        secondaryColor: 0xffe082,
+        style: 'child',
+        hasBalloon: true,
+        balloonColor: 0xffea00,
+        walkSpeed: 1.85,
+        waypoints: [
+          { x: -3.2, z: 2 },
+          { x: 3.2, z: 2 },
+          { x: 3.2, z: -16 },
+          { x: -3.2, z: -16 },
+        ],
+        greetingText: 'शुभ दीपावली! हैप्पी दिवाली! चलो मेले में झूला झूलें!',
+        voiceLine: 'Happy Diwali! Come ride the Royal Peacock Carousel with us!',
+      },
+      {
+        name: 'Chacha Chaudhary',
+        outfitColor: 0xb71c1c,
+        secondaryColor: 0xffffff,
+        style: 'kurta',
+        hasTurban: true,
+        walkSpeed: 1.35,
+        waypoints: [
+          { x: -8.5, z: -14 },
+          { x: 8.5, z: -14 },
+          { x: 8.5, z: -26 },
+          { x: -8.5, z: -26 },
+        ],
+        greetingText: 'शुभ दीपावली! जगमग मेले की रौनक ही निराली है!',
+        voiceLine: 'Shubh Deepavali! There is nothing quite like the warmth of an Indian Diwali Mela!',
+      },
+      {
+        name: 'Radhika',
+        outfitColor: 0xd81b60,
+        secondaryColor: 0xffd54f,
+        style: 'saree',
+        hasSparkler: true,
+        walkSpeed: 1.5,
+        waypoints: [
+          { x: 8.0, z: -25 },
+          { x: -8.0, z: -25 },
+          { x: -8.0, z: -15 },
+          { x: 8.0, z: -15 },
+        ],
+        greetingText: 'Happy Diwali! हर घर में उजाला हो, हर दिल में खुशी हो!',
+        voiceLine: 'Happy Diwali! May every home glow with diyas and every heart be filled with joy!',
+      },
+      {
+        name: 'Manish',
+        outfitColor: 0x00695c,
+        secondaryColor: 0xffe082,
+        style: 'kurta',
+        walkSpeed: 1.6,
+        waypoints: [
+          { x: -14, z: -18 },
+          { x: -6, z: -28 },
+          { x: 6, z: -28 },
+          { x: 14, z: -18 },
+        ],
+        greetingText: 'Happy Diwali! आकाशदीप टावर का ग्रैंड फिनाले ज़रूर देखना!',
+        voiceLine: 'Happy Diwali! Make sure you watch the Grand Finale of 108 sky lanterns!',
+      },
+      {
+        name: 'Simran',
+        outfitColor: 0xe65100,
+        secondaryColor: 0xfff59d,
+        style: 'saree',
+        hasBalloon: true,
+        balloonColor: 0xe040fb,
+        walkSpeed: 1.55,
+        waypoints: [
+          { x: 14, z: -19 },
+          { x: 6, z: -29 },
+          { x: -6, z: -29 },
+          { x: -14, z: -19 },
+        ],
+        greetingText: 'शुभ दीपावली! सेल्फी तोरण पर फोटो पोस्टकार्ड बनाना मत भूलना!',
+        voiceLine: 'Shubh Deepavali! Do not forget to take a festive Diwali postcard at the selfie booth!',
+      },
+    ];
+
+    for (let i = 0; i < roamers.length; i++) {
+      const r = roamers[i];
+      const startWp = r.waypoints[0];
+      const nextWp = r.waypoints[1 % r.waypoints.length];
+      const initialYaw = Math.atan2(nextWp.x - startWp.x, nextWp.z - startWp.z);
+
+      const char = this.createVisitorCharacterMesh({
+        outfitColor: r.outfitColor,
+        secondaryColor: r.secondaryColor,
+        style: r.style,
+        hasTurban: r.hasTurban,
+        hasBalloon: r.hasBalloon,
+        balloonColor: r.balloonColor,
+        hasSparkler: r.hasSparkler,
+        name: r.name,
+        greetingText: r.greetingText,
+      });
+      char.group.position.set(startWp.x, 0, startWp.z);
+      char.group.rotation.y = initialYaw;
+      this.dynamicRoot.add(char.group);
+
+      this.crowdVisitors.push({
+        ...char,
+        role: 'roaming',
+        name: r.name,
+        greetingText: r.greetingText,
+        voiceLine: r.voiceLine,
+        walkSpeed: r.walkSpeed,
+        waypoints: r.waypoints,
+        currentWaypoint: 1 % r.waypoints.length,
+        baseYaw: initialYaw,
+        phase: i * 1.9,
+        waveTimer: 0,
+      });
+    }
+  }
+
+  private checkCrowdClick(clientX: number, clientY: number): boolean {
+    if (this.crowdVisitors.length === 0) return false;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.pointerNDC, this.camera);
+
+    const groups = this.crowdVisitors.map((v) => v.group);
+    const hits = this.raycaster.intersectObjects(groups, true);
+    if (hits.length > 0 && hits[0].distance < 28) {
+      const hitObj = hits[0].object;
+      const visitor = this.crowdVisitors.find((v) => {
+        let curr: THREE.Object3D | null = hitObj;
+        while (curr) {
+          if (curr === v.group) return true;
+          curr = curr.parent;
+        }
+        return false;
+      });
+
+      if (visitor) {
+        // Trigger festive Happy Diwali greeting!
+        visitor.waveTimer = 4.5;
+        visitor.greetingSprite.visible = true;
+
+        // If standing or roaming, turn warmly toward the player
+        if (visitor.role !== 'sitting') {
+          const dx = this.camera.position.x - visitor.group.position.x;
+          const dz = this.camera.position.z - visitor.group.position.z;
+          visitor.group.rotation.y = Math.atan2(dx, dz);
+        }
+
+        // Golden celebration spark burst above visitor
+        this.spawnFireworkBurst(
+          visitor.group.position.x,
+          visitor.group.position.y + 2.1,
+          visitor.group.position.z,
+          28,
+          0xffd269
+        );
+        this.audio.effect('sparkle');
+        this.audio.speak(visitor.voiceLine);
+        this.callbacks.onToast(`🪔 ${visitor.name}: "${visitor.greetingText}"`);
+        return true;
+
+      }
+    }
+    return false;
+  }
+
+  private updateCrowdAnimations(dt: number): void {
+    const t = this.elapsed;
+
+    for (let i = 0; i < this.crowdVisitors.length; i++) {
+      const v = this.crowdVisitors[i];
+
+      // Handle active "Happy Diwali!" greeting wave & overhead bubble
+      if (v.waveTimer > 0) {
+        v.waveTimer = Math.max(0, v.waveTimer - dt);
+        v.greetingSprite.visible = true;
+        const popScale = Math.min(1, (4.5 - v.waveTimer) * 6);
+        const pulse = 1 + Math.sin(t * 7) * 0.05;
+        v.greetingSprite.scale.set(2.4 * popScale * pulse, 0.9 * popScale * pulse, 1);
+
+        // Enthusiastic Happy Diwali wave with right arm raised high
+        v.rightArm.rotation.x = -2.45 + Math.sin(t * 12) * 0.35;
+        v.rightArm.rotation.z = -0.25 + Math.cos(t * 12) * 0.28;
+        v.leftArm.rotation.x = -0.6 + Math.sin(t * 6) * 0.15;
+        v.head.rotation.y = Math.sin(t * 5) * 0.18;
+
+        if (v.waveTimer <= 0) {
+          v.greetingSprite.visible = false;
+          v.rightArm.rotation.set(0, 0, 0);
+          v.leftArm.rotation.set(0, 0, 0);
+          if (v.role === 'standing') {
+            v.group.rotation.y = v.baseYaw;
+          }
+        }
+        continue;
+      }
+
+      if (v.role === 'roaming' && v.waypoints.length > 1) {
+        const target = v.waypoints[v.currentWaypoint];
+        const dx = target.x - v.group.position.x;
+        const dz = target.z - v.group.position.z;
+        const dist = Math.hypot(dx, dz);
+
+        if (dist < 0.35) {
+          v.currentWaypoint = (v.currentWaypoint + 1) % v.waypoints.length;
+        } else {
+          const step = Math.min(dist, v.walkSpeed * dt);
+          v.group.position.x += (dx / dist) * step;
+          v.group.position.z += (dz / dist) * step;
+
+          const desiredYaw = Math.atan2(dx, dz);
+          // Smooth rotation toward walking direction
+          let diff = desiredYaw - v.group.rotation.y;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          v.group.rotation.y += diff * Math.min(1, dt * 6);
+        }
+
+        // Walking stride leg & arm swing
+        const walkCycle = t * v.walkSpeed * 4.2 + v.phase;
+        v.leftLeg.rotation.x = Math.sin(walkCycle) * 0.48;
+        v.rightLeg.rotation.x = -Math.sin(walkCycle) * 0.48;
+        v.leftArm.rotation.x = -Math.sin(walkCycle) * 0.36;
+        v.rightArm.rotation.x = Math.sin(walkCycle) * 0.36;
+        v.bodyGroup.position.y = Math.abs(Math.sin(walkCycle)) * 0.045;
+        v.head.rotation.y = Math.sin(t * 1.6 + v.phase) * 0.14;
+      } else if (v.role === 'sitting') {
+        // Seated diners eating jalebi / chaat / sipping kulhad chai and chatting across the table
+        const eatCycle = Math.sin(t * 2.1 + v.phase);
+        if (eatCycle > 0.2) {
+          // Bring right hand food/chai toward mouth
+          const lift = (eatCycle - 0.2) / 0.8;
+          v.rightArm.rotation.x = -0.6 - lift * 1.15;
+          v.rightArm.rotation.z = -lift * 0.35;
+          v.head.rotation.x = lift * 0.15;
+        } else {
+          v.rightArm.rotation.x = -0.55;
+          v.rightArm.rotation.z = 0;
+          v.head.rotation.x = 0;
+        }
+        v.head.rotation.y = Math.sin(t * 1.5 + v.phase) * 0.22;
+      } else if (v.role === 'standing') {
+        // Shoppers admiring stalls, pointing at items, and chatting
+        const gesture = Math.sin(t * 2.4 + v.phase);
+        v.bodyGroup.position.y = Math.sin(t * 1.8 + v.phase) * 0.015;
+        v.head.rotation.y = Math.sin(t * 1.4 + v.phase) * 0.25;
+        v.rightArm.rotation.x = -0.35 + Math.max(0, gesture) * -0.55;
+        v.leftArm.rotation.x = -0.15 + Math.sin(t * 1.9 + v.phase) * 0.12;
+      }
+    }
+  }
+
   public dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.frameId);
@@ -3081,3 +4228,4 @@ export class MelaEngine {
     this.renderer.dispose();
   }
 }
+

@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#3a1d32" />
+      <stop offset="65%" stop-color="#151026" />
+      <stop offset="100%" stop-color="#090c18" />
+    </radialGradient>
+    <linearGradient id="goldRim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff3b0" />
+      <stop offset="50%" stop-color="#ffaa00" />
+      <stop offset="100%" stop-color="#c86400" />
+    </linearGradient>
+    <linearGradient id="flameOuter" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#fff8d6" />
+      <stop offset="45%" stop-color="#ffaa00" />
+      <stop offset="100%" stop-color="#ff3300" />
+    </linearGradient>
+    <linearGradient id="diyaBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e0531f" />
+      <stop offset="50%" stop-color="#b52b10" />
+      <stop offset="100%" stop-color="#6e1409" />
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Rounded Festive Badge Background -->
+  <rect width="128" height="128" rx="28" fill="url(#bgGlow)" />
+  <rect x="4" y="4" width="120" height="120" rx="24" fill="none" stroke="url(#goldRim)" stroke-width="3" opacity="0.85" />
+
+  <!-- Subtle Rangoli / Mandala Petals in Background -->
+  <g transform="translate(64, 68)" opacity="0.22" stroke="#ffcc33" stroke-width="1.5" fill="none">
+    <circle r="46" stroke-dasharray="5 5" />
+    <circle r="36" />
+    <path d="M0,-46 L8,-32 L0,-20 L-8,-32 Z" fill="#ff9933" />
+    <path d="M0,46 L8,32 L0,20 L-8,32 Z" fill="#ff9933" />
+    <path d="M-46,0 L-32,8 L-20,0 L-32,-8 Z" fill="#ff9933" />
+    <path d="M46,0 L32,8 L20,0 L32,-8 Z" fill="#ff9933" />
+  </g>
+
+  <!-- Sparkle Stars -->
+  <g fill="#ffe680">
+    <circle cx="26" cy="30" r="2.5" />
+    <circle cx="102" cy="30" r="2.5" />
+    <circle cx="20" cy="64" r="1.8" />
+    <circle cx="108" cy="64" r="1.8" />
+    <path d="M32,20 L34,25 L39,27 L34,29 L32,34 L30,29 L25,27 L30,25 Z" opacity="0.85" />
+    <path d="M96,20 L98,25 L103,27 L98,29 L96,34 L94,29 L89,27 L94,25 Z" opacity="0.85" />
+  </g>
+
+  <!-- Radiant Aura Behind Flame -->
+  <circle cx="64" cy="42" r="22" fill="#ff9900" opacity="0.28" filter="url(#glow)" />
+
+  <!-- Diya Flame (Jyoti) -->
+  <path d="M64,14 C64,14 82,35 78,50 C75,60 69,64 64,64 C59,64 53,60 50,50 C46,35 64,14 64,14 Z" fill="url(#flameOuter)" filter="url(#glow)" />
+  <path d="M64,26 C64,26 74,40 72,50 C70,56 67,59 64,59 C61,59 58,56 56,50 C54,40 64,26 64,26 Z" fill="#fff9d2" />
+
+  <!-- Ornate Terracotta & Gold Diya Bowl -->
+  <path d="M22,68 Q64,58 106,68 C102,94 84,108 64,108 C44,108 26,94 22,68 Z" fill="url(#diyaBody)" stroke="url(#goldRim)" stroke-width="3.5" />
+
+  <!-- Golden Rim & Decorative Scallops on Diya -->
+  <path d="M22,68 Q64,76 106,68" fill="none" stroke="url(#goldRim)" stroke-width="4" stroke-linecap="round" />
+  <path d="M32,82 Q48,92 64,82 Q80,92 96,82" fill="none" stroke="#ffd24d" stroke-width="2.5" stroke-linecap="round" opacity="0.9" />
+
+  <!-- Center Jewel on Diya -->
+  <circle cx="64" cy="95" r="4" fill="#ffe680" />
+  <circle cx="46" cy="91" r="2.5" fill="#ffcc33" />
+  <circle cx="82" cy="91" r="2.5" fill="#ffcc33" />
+</svg>
