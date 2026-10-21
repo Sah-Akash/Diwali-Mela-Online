@@ -160,6 +160,65 @@ export const DEFAULT_PARTNER_STALLS: PartnerStallData[] = [
 ];
 
 export const CORE_MELA_ATTRACTIONS: MelaInteractableSpec[] = [
+  // Entrance Welcome Carts: Ice Gola Thela & Glass Bangles / Mehendi Bazaar
+  {
+    id: 'food-gola',
+    name: 'Kala Khatta Baraf Gola & Kulfi Thela',
+    hindiSub: 'काला खट्टा बर्फ का गोला और मटका कुल्फी ठेला',
+    type: 'food',
+    x: -12,
+    z: 42,
+    rotY: Math.PI / 2,
+    theme: 'gulabi',
+    greeting:
+      'Ting-ting! Bachpan wala Kala Khatta, Kaccha Aam aur Rose Baraf ka Gola! Upar se malai rabri aur chaat masala daal doon?',
+    description:
+      'Traditional wooden mela pushcart serving rainbow Kala Khatta ice golas and malai stick kulfi.',
+    choices: [
+      {
+        label: 'Rainbow Kala Khatta Baraf Gola · Free',
+        item: 'Kala Khatta Ice Gola',
+        reply: 'Khatta-meetha Kala Khatta aur Rooh-Afza wala Baraf Gola! Zubaan rangin ho gayi na!',
+      },
+      {
+        label: 'Kaccha Aam & Masala Chuski · Free',
+        item: 'Kaccha Aam Chuski',
+        reply: 'Chatpata kala namak aur kachi keri ki chuski—asli mela swaad!',
+      },
+    ],
+  },
+  {
+    id: 'stall-bangles',
+    name: 'Suhaag Kangan & Festive Mehendi Bazaar',
+    hindiSub: 'सुहाग चूड़ी, कंगन और दिवाली मेहंदी',
+    type: 'diya-craft',
+    x: 12,
+    z: 42,
+    rotY: -Math.PI / 2,
+    theme: 'sindoori',
+    greeting:
+      'Khan-khan karti Firozabad ki kaanch ki choodiyan,undan kangan aur rachi-rachi Diwali Mehendi! Apne ghar ke liye shubh shagun le jaaiye!',
+    description:
+      'Glittering rows of Firozabad glass bangles, golden lac kangans, and organic Rajasthani Mehendi cones.',
+    choices: [
+      {
+        label: 'Firozabad Glass Choodi Set · Free',
+        item: 'Resham Kaanch Choodi Set',
+        reply: 'Laal, hare aur sunehre rang ki khanakti choodiyan aapke Mela Bag mein rakh di hain!',
+      },
+      {
+        label: 'Rajasthani Diwali Mehendi Cone · Free',
+        item: 'Shubh Diwali Mehendi',
+        reply: 'Gehra laal rang rachega! Hatho mein sukh-samriddhi ki mehendi.',
+      },
+      {
+        label: 'Kundan & Mirror-Work Kangan · Free',
+        item: 'Kundan Kangan Pair',
+        reply: 'Chamakte mirror-work wale shahi kangan—Shubh Deepavali!',
+      },
+    ],
+  },
+
   // Food & Mithai Gali
   {
     id: 'food-mithai',

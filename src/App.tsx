@@ -100,6 +100,20 @@ export default function App() {
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
 
+  // Personalized WhatsApp Invite (?from=YourName) & Wish Sky Lantern Modal State
+  const [invitedByName] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('from') || params.get('invite') || '';
+    return raw.trim() ? raw.trim().slice(0, 32) : null;
+  });
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [customInviteName, setCustomInviteName] = useState('');
+  const [wishLanternOpen, setWishLanternOpen] = useState(false);
+  const [wishSenderName, setWishSenderName] = useState('');
+  const [wishMessage, setWishMessage] = useState('Ghar mein sukh, shanti aur samriddhi bani rahe! Shubh Deepavali!');
+
+
   // Multi-page SEO route & drawer state
   const [seoSlug, setSeoSlug] = useState<SeoPageSlug>(() => resolveInitialSeoSlug().slug);
   const [seoOpen, setSeoOpen] = useState<boolean>(() => resolveInitialSeoSlug().openByDefault);
@@ -454,6 +468,28 @@ export default function App() {
             <button
               onClick={() => {
                 setMenuOpen(false);
+                setWishLanternOpen(true);
+              }}
+              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-white/10 text-left text-[#ffe3a8] transition-colors cursor-pointer"
+            >
+              <Flame className="w-3.5 h-3.5 text-[#ff9f1c] shrink-0" />
+              <span>Release Wish Sky Lantern</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                setInviteModalOpen(true);
+              }}
+              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-white/10 text-left text-[#ffd98e] transition-colors cursor-pointer"
+            >
+              <Share2 className="w-3.5 h-3.5 text-[#4cc9f0] shrink-0" />
+              <span>Invite Friends (?from=You)</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setMenuOpen(false);
                 setStallModal('create');
               }}
               className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-white/10 text-left transition-colors cursor-pointer"
@@ -489,6 +525,7 @@ export default function App() {
         )}
       </div>
 
+
       {/* WELCOME / ENTRY SCREEN (Matches mela-chaloge.vercel.app layout & poetry for Diwali) */}
       {mode === 'welcome' && (
         <main
@@ -509,6 +546,15 @@ export default function App() {
 
           {/* Left Editorial Hero Copy */}
           <div className="max-w-xl my-auto pointer-events-auto">
+            {invitedByName && (
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 mb-3 rounded-full bg-[#f1aa49]/20 border border-[#f1aa49]/60 text-xs font-semibold text-[#ffe3a8] shadow-lg">
+                <span>🪔</span>
+                <span>
+                  <strong className="text-white">{invitedByName}</strong> invited you to celebrate Diwali Mela together!
+                </span>
+              </div>
+            )}
+
             <div className="text-[11px] font-semibold tracking-[0.24em] text-[#f0c27e] mb-3">
               THE DIWALI MELA IS OPEN · EVERY GAME IS FREE
             </div>
@@ -523,7 +569,8 @@ export default function App() {
             </h1>
 
             <p className="font-display italic text-xl sm:text-2xl text-[#eed9b9] mb-6">
-              Mela chaloge mere sath? <span className="text-[#e87a70]">♥</span>
+              {invitedByName ? `${invitedByName} says: Mela chaloge mere sath? ` : 'Mela chaloge mere sath? '}
+              <span className="text-[#e87a70]">♥</span>
             </p>
 
             {/* Primary Enter Button */}
@@ -551,10 +598,16 @@ export default function App() {
             {/* Welcome Community Action Buttons */}
             <div className="flex flex-wrap items-center gap-2.5 mb-4">
               <button
-                onClick={handleSnapPostcard}
+                onClick={() => setInviteModalOpen(true)}
                 className="px-3.5 py-2.5 rounded-lg bg-[#eac58a] text-[#1b302f] text-xs font-bold hover:bg-[#ffd99d] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
                 ↗ Doston ko bulao · Invite
+              </button>
+              <button
+                onClick={() => setWishLanternOpen(true)}
+                className="px-3.5 py-2.5 rounded-lg bg-[#1e162b]/90 border border-[#f1aa49]/50 text-xs font-semibold text-[#ffd27d] hover:bg-[#2c1f40] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                🏮 Release Wish Sky Lantern
               </button>
               <button
                 onClick={() => setStallModal('create')}
@@ -573,10 +626,12 @@ export default function App() {
             {/* Quick Teleport Pills */}
             <div className="flex flex-wrap items-center gap-1.5 pt-2">
               {[
+                { id: 'food-gola', label: '🍧 Kala Khatta Gola & Kulfi' },
+                { id: 'stall-bangles', label: '✨ Choodi & Mehendi Bazaar' },
                 { id: 'food-jalebi', label: 'Garam Jalebi & Chaat' },
                 { id: 'game-balloon', label: 'Balloon Shoot' },
                 { id: 'game-ring', label: 'Golden Ring Toss' },
-                { id: 'game-diya', label: 'Light 7 Diyas' },
+                { id: 'game-diya', label: '🔔 7 Diyas & Maha-Aarti' },
                 { id: 'rangoli-art', label: '🎨 Rangoli Floor Art' },
                 { id: 'daan-peti', label: '🪔 Charity Daan Peti' },
                 { id: 'ride-wheel', label: 'Chand Wala Jhoola' },
@@ -597,6 +652,7 @@ export default function App() {
               Sound begins when you enter. Every game and virtual souvenir is free.
             </p>
           </div>
+
 
           {/* Welcome Footer with Crawlable Internal Links to All 6 SEO Pages */}
           <div className="flex flex-col gap-2 pointer-events-auto">
@@ -1055,6 +1111,26 @@ export default function App() {
                 </div>
               )}
 
+              {/* 7 DIYAS MANDAP: RING MANDIR GHANTI & PERFORM MAHA-AARTI CONTROLS */}
+              {gameHud.mode === 'diya-game' && (
+                <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => engineRef.current?.ringMandapBell()}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#261a36] border border-[#f1aa49]/50 text-xs font-semibold text-[#ffd27d] hover:bg-[#35234b] transition-colors cursor-pointer"
+                  >
+                    🔔 Ring Mandir Ghanti (Bell)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => engineRef.current?.performMahaAarti()}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#f1aa49] text-[#121726] text-xs font-bold hover:bg-[#ffbe61] transition-colors cursor-pointer"
+                  >
+                    🪔 Perform Lakshmi-Ganesh Maha-Aarti
+                  </button>
+                </div>
+              )}
+
               <div className="flex items-center justify-center gap-3">
                 {gameHud.mode === 'rangoli' && (
                   <button
@@ -1080,6 +1156,7 @@ export default function App() {
                     Play Again Free ↻
                   </button>
                 )}
+
 
                 <button
                   onClick={() => engineRef.current?.leaveActivity()}
@@ -1313,16 +1390,38 @@ export default function App() {
               )}
 
               {talkSpec.type === 'diya-game' && (
-                <button
-                  onClick={() => {
-                    const s = talkSpec;
-                    setTalkSpec(null);
-                    engineRef.current?.startMiniGame('diya-game', s);
-                  }}
-                  className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
-                >
-                  Light All 7 Deepotsav Mandap Diyas · FREE →
-                </button>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      const s = talkSpec;
+                      setTalkSpec(null);
+                      engineRef.current?.startMiniGame('diya-game', s);
+                    }}
+                    className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
+                  >
+                    Light All 7 Deepotsav Mandap Diyas · FREE →
+                  </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        engineRef.current?.ringMandapBell();
+                        setTalkReply('टन-टन! Mandir Ghanti ki pavitra dhun se poora mela goonj utha!');
+                      }}
+                      className="px-3.5 py-2.5 rounded-xl bg-[#1b2640] border border-[#f1aa49]/40 text-xs font-semibold text-[#ffd27d] hover:bg-[#253457] cursor-pointer"
+                    >
+                      🔔 Ring Mandir Ghanti
+                    </button>
+                    <button
+                      onClick={() => {
+                        engineRef.current?.performMahaAarti();
+                        setTalkReply('Om Jai Lakshmi Mata! Aapko aur aapke parivaar ko Maa Lakshmi ka aashirwad mile!');
+                      }}
+                      className="px-3.5 py-2.5 rounded-xl bg-[#2a1a2e] border border-[#f1aa49]/50 text-xs font-semibold text-[#fff5de] hover:bg-[#3a2440] cursor-pointer"
+                    >
+                      🪔 Perform Maha-Aarti
+                    </button>
+                  </div>
+                </div>
               )}
 
               {talkSpec.type === 'rangoli' && (
@@ -1409,30 +1508,73 @@ export default function App() {
 
               {/* Fireworks & Finale */}
               {talkSpec.type === 'fireworks' && (
-                <button
-                  onClick={() => {
-                    const s = talkSpec;
-                    setTalkSpec(null);
-                    engineRef.current?.startFireworkShow(s);
-                  }}
-                  className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
-                >
-                  Light up the virtual sky ✦
-                </button>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      const s = talkSpec;
+                      setTalkSpec(null);
+                      engineRef.current?.startFireworkShow(s);
+                    }}
+                    className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
+                  >
+                    Light up the virtual sky ✦
+                  </button>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => {
+                        setTalkSpec(null);
+                        engineRef.current?.lightGroundCracker('anaar');
+                      }}
+                      className="px-2.5 py-2 rounded-xl bg-[#1b2640] border border-[#f1aa49]/35 text-xs font-semibold text-[#ffd27d] hover:bg-[#253457] cursor-pointer"
+                    >
+                      🎇 Light Anaar
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTalkSpec(null);
+                        engineRef.current?.lightGroundCracker('chakri');
+                      }}
+                      className="px-2.5 py-2 rounded-xl bg-[#1b2640] border border-[#f1aa49]/35 text-xs font-semibold text-[#7ce8ff] hover:bg-[#253457] cursor-pointer"
+                    >
+                      🌀 Spin Chakri
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTalkSpec(null);
+                        engineRef.current?.lightGroundCracker('rocket');
+                      }}
+                      className="px-2.5 py-2 rounded-xl bg-[#1b2640] border border-[#f1aa49]/35 text-xs font-semibold text-[#ff9ebb] hover:bg-[#253457] cursor-pointer"
+                    >
+                      🚀 Sky Rocket
+                    </button>
+                  </div>
+                </div>
               )}
 
               {talkSpec.type === 'finale' && (
-                <button
-                  onClick={() => {
-                    const s = talkSpec;
-                    setTalkSpec(null);
-                    engineRef.current?.startGrandFinale(s);
-                  }}
-                  className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
-                >
-                  Begin 1008 Akashdeep Finale →
-                </button>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      const s = talkSpec;
+                      setTalkSpec(null);
+                      engineRef.current?.startGrandFinale(s);
+                    }}
+                    className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
+                  >
+                    Begin 1008 Akashdeep Finale →
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTalkSpec(null);
+                      setWishLanternOpen(true);
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[#1b2640] border border-[#f1aa49]/40 text-xs font-semibold text-[#ffd27d] hover:bg-[#253457] cursor-pointer"
+                  >
+                    🏮 Release Personalized Wish Sky Lantern With Your Name →
+                  </button>
+                </div>
               )}
+
 
               <button
                 onClick={() => setTalkSpec(null)}
@@ -1684,6 +1826,207 @@ export default function App() {
         communityDiyas={communityDiyas}
       />
 
+      {/* PERSONALIZED WHATSAPP INVITE LINK MODAL (?from=YourName) */}
+      {inviteModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#080c16]/80 backdrop-blur-sm pointer-events-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Invite Friends to Diwali Mela Online"
+        >
+          <div className="relative w-full max-w-md rounded-2xl bg-[#131b2e] border border-[#f1aa49]/45 p-6 text-[#f7e7c4] shadow-2xl">
+            <button
+              onClick={() => setInviteModalOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-lg text-[#d8c39e] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              aria-label="Close invite modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-xs font-semibold tracking-wider text-[#f1aa49] mb-1">
+              DOSTON KO BULAO · PERSONALIZED INVITE
+            </div>
+            <h2 className="text-2xl font-display font-bold text-[#fff5de] mb-2">
+              Mela chaloge mere sath? 🪔
+            </h2>
+            <p className="text-xs text-[#d8c39e] mb-4">
+              Type your name below to create your personal Diwali Mela invite link. When your friends open it, the mela will greet them with your name!
+            </p>
+
+            <label className="block text-xs font-semibold text-[#f1aa49] mb-1.5">
+              Your Name (आपका नाम)
+            </label>
+            <input
+              type="text"
+              value={customInviteName}
+              onChange={(e) => setCustomInviteName(e.target.value)}
+              placeholder="e.g. Aayan, Priya, Sharma Family..."
+              maxLength={32}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b101d] border border-[#f1aa49]/35 text-sm text-[#fff5de] placeholder-[#7c8599] mb-4 focus:outline-none focus:border-[#f1aa49]"
+            />
+
+            <div className="p-3 rounded-xl bg-[#0b101d] border border-[#f1aa49]/25 text-xs text-[#e5c99b] mb-4 break-all font-mono-num">
+              {`${typeof window !== 'undefined' ? window.location.origin : 'https://diwali-mela-online.vercel.app'}/?from=${encodeURIComponent(
+                (customInviteName || 'Aayan').trim()
+              )}`}
+            </div>
+
+            <div className="space-y-2.5">
+              <button
+                onClick={() => {
+                  const sender = (customInviteName || 'Your Friend').trim();
+                  const shareUrl = `${window.location.origin}/?from=${encodeURIComponent(sender)}`;
+                  navigator.clipboard?.writeText(shareUrl);
+                  showToast(`📋 Copied your personal invite link (?from=${sender})!`);
+                }}
+                className="w-full py-2.5 rounded-xl bg-[#f1aa49] text-[#121726] text-xs font-bold hover:bg-[#ffbe61] transition-colors cursor-pointer"
+              >
+                Copy Personal Invite Link 📋
+              </button>
+
+              <a
+                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                  `🪔 *${(customInviteName || 'Your Friend').trim()}* is inviting you to *Diwali Mela Online*! ✨\n\nMela chaloge mere sath? Roam the 3D Diwali bazaar, light 7 diyas, make floor rangoli & burst crackers together:\n${
+                    typeof window !== 'undefined' ? window.location.origin : 'https://diwali-mela-online.vercel.app'
+                  }/?from=${encodeURIComponent((customInviteName || 'Friend').trim())}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-[#1f8b4c] hover:bg-[#25a25a] text-white text-xs font-bold transition-colors"
+              >
+                <span>Share Invite on WhatsApp ↗</span>
+              </a>
+
+              <button
+                onClick={() => {
+                  setInviteModalOpen(false);
+                  handleSnapPostcard();
+                }}
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-[#1b2640] border border-[#f1aa49]/35 text-xs font-semibold text-[#fff5de] hover:bg-[#253457] transition-colors cursor-pointer"
+              >
+                <Camera className="w-3.5 h-3.5 text-[#f1aa49]" />
+                <span>Or Snap a 3D Selfie Postcard 📸</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FLOATING WISH SKY LANTERN (AKASHDEEP MANNAT) MODAL */}
+      {wishLanternOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#080c16]/80 backdrop-blur-sm pointer-events-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Release a Personalized Wish Sky Lantern"
+        >
+          <div className="relative w-full max-w-md rounded-2xl bg-[#131b2e] border border-[#f1aa49]/45 p-6 text-[#f7e7c4] shadow-2xl">
+            <button
+              onClick={() => setWishLanternOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-lg text-[#d8c39e] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              aria-label="Close wish lantern modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-xs font-semibold tracking-wider text-[#f1aa49] mb-1">
+              आकाशदीप मन्नत · PERSONALIZED SKY LANTERN
+            </div>
+            <h2 className="text-2xl font-display font-bold text-[#fff5de] mb-2">
+              Release a Wish Sky Lantern 🏮
+            </h2>
+            <p className="text-xs text-[#d8c39e] mb-4">
+              Write your name and Diwali prayer. A glowing 3D Akashdeep carrying your name and wish banner will rise into the starry fairground sky!
+            </p>
+
+            <div className="space-y-3 mb-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#f1aa49] mb-1">
+                  Your Name (आपका नाम)
+                </label>
+                <input
+                  type="text"
+                  value={wishSenderName}
+                  onChange={(e) => setWishSenderName(e.target.value)}
+                  placeholder="e.g. Aayan, Meera, Verma Family..."
+                  maxLength={26}
+                  className="w-full px-3.5 py-2 rounded-xl bg-[#0b101d] border border-[#f1aa49]/35 text-sm text-[#fff5de] placeholder-[#7c8599] focus:outline-none focus:border-[#f1aa49]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#f1aa49] mb-1">
+                  Your Diwali Wish / Prayer (आपकी मन्नत)
+                </label>
+                <input
+                  type="text"
+                  value={wishMessage}
+                  onChange={(e) => setWishMessage(e.target.value)}
+                  placeholder="Write your Diwali blessing..."
+                  maxLength={56}
+                  className="w-full px-3.5 py-2 rounded-xl bg-[#0b101d] border border-[#f1aa49]/35 text-sm text-[#fff5de] placeholder-[#7c8599] focus:outline-none focus:border-[#f1aa49]"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {[
+                  'Har ghar mein sukh, shanti aur ujala ho! 🪔',
+                  'Maa Lakshmi bless everyone with health & joy! ✨',
+                  'Happy Diwali 2026 to all my friends & family! ♥',
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setWishMessage(preset)}
+                    className="px-2.5 py-1 rounded-lg bg-[#1b2640] border border-[#f1aa49]/25 text-[11px] text-[#dfcba8] hover:border-[#f1aa49] hover:text-white cursor-pointer"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                const sender = wishSenderName.trim() || invitedByName || 'Diwali Friend';
+                const wish = wishMessage.trim() || 'Shubh Deepavali! Sukh, Shanti & Samriddhi!';
+                setWishLanternOpen(false);
+                if (mode === 'welcome') {
+                  engineRef.current?.enterMela();
+                  window.setTimeout(() => {
+                    engineRef.current?.launchWishLantern(sender, wish);
+                  }, 900);
+                } else {
+                  engineRef.current?.launchWishLantern(sender, wish);
+                }
+                setCommunityDiyas((c) => c + 1);
+                setBlessingsList((prev) => [`${wish} — ${sender}`, ...prev.slice(0, 6)]);
+              }}
+              className="w-full py-3 rounded-xl bg-[#f1aa49] text-[#121726] text-xs font-bold hover:bg-[#ffbe61] transition-colors cursor-pointer"
+            >
+              🏮 Release Glowing Akashdeep Into the Sky →
+            </button>
+
+            {/* Recent Community Sky Lantern Wishes */}
+            <div className="mt-4 pt-3 border-t border-[#f1aa49]/20">
+              <div className="text-[10px] font-semibold tracking-wider text-[#f1aa49] mb-2">
+                RECENT AKASHDEEP WISHES IN THE SKY ({communityDiyas})
+              </div>
+              <div className="space-y-1.5 max-h-28 overflow-y-auto">
+                {blessingsList.slice(0, 3).map((b, idx) => (
+                  <div
+                    key={idx}
+                    className="px-3 py-1.5 rounded-lg bg-[#0b101d] border border-[#f1aa49]/15 text-[11px] text-[#e5c99b]"
+                  >
+                    🏮 {b}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TOAST NOTIFICATION */}
       {toast && (
         <div
@@ -1693,6 +2036,7 @@ export default function App() {
           {toast}
         </div>
       )}
+
 
       {/* UNIFIED COLLAPSIBLE BOTTOM CONTROL DOCK (Zero Viewport Occlusion) */}
       {mode !== 'welcome' && (
@@ -1719,44 +2063,78 @@ export default function App() {
 
           {!dockCollapsed && (
             <div className="flex flex-wrap items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[#10182b]/95 border border-[#f1aa49]/40 shadow-2xl">
-              {/* Invite & Promote Stall Highlight Buttons (Like community-dock in mela-chaloge) */}
+              {/* Invite & Promote Stall Highlight Buttons */}
               <button
-                onClick={handleSnapPostcard}
+                onClick={() => setInviteModalOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#f2cf94] text-[#1b302d] text-xs font-bold hover:bg-[#ffe2b0] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Camera className="w-3.5 h-3.5" />
-                Invite · Postcard
+                <Share2 className="w-3.5 h-3.5" />
+                Invite Friends
               </button>
 
               <button
-                onClick={() => setStallModal('create')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#192f32] border border-[#e7c389]/45 text-xs font-semibold text-[#f1d3a2] hover:bg-[#223f43] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                onClick={handleSnapPostcard}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1d2842] border border-[#f1aa49]/40 text-xs font-semibold text-[#ffe0a6] hover:bg-[#273659] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Store className="w-3.5 h-3.5 text-[#f1aa49]" />
-                Apni Dukaan Lagao
+                <Camera className="w-3.5 h-3.5 text-[#f1aa49]" />
+                Postcard
+              </button>
+
+              <button
+                onClick={() => setWishLanternOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#2a1832] border border-[#f1aa49]/45 text-xs font-semibold text-[#ffd27d] hover:bg-[#3a2246] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                title="Write your name & wish on a floating 3D Sky Lantern"
+              >
+                🏮 Wish Lantern
+              </button>
+
+              <div className="h-4 w-[1px] bg-[#f1aa49]/25 mx-0.5 hidden sm:block" />
+
+              {/* Instant Ground Patakha Buttons (Anaar, Chakri, Sky Rocket) */}
+              <button
+                onClick={() => engineRef.current?.lightGroundCracker('anaar')}
+                className="px-2.5 py-1.5 rounded-lg bg-[#2b1620] border border-[#ff758f]/40 hover:bg-[#3d1f2d] text-xs font-semibold text-[#ffb3c1] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                title="Light a sparkling Golden Anaar fountain"
+              >
+                🎇 Anaar
+              </button>
+              <button
+                onClick={() => engineRef.current?.lightGroundCracker('chakri')}
+                className="px-2.5 py-1.5 rounded-lg bg-[#122b2a] border border-[#06d6a0]/40 hover:bg-[#193d3b] text-xs font-semibold text-[#80ffdb] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                title="Spin a Ground Chakri wheel"
+              >
+                🌀 Chakri
+              </button>
+              <button
+                onClick={() => engineRef.current?.lightGroundCracker('rocket')}
+                className="px-2.5 py-1.5 rounded-lg bg-[#2b2112] border border-[#ffbe0b]/40 hover:bg-[#3d2f19] text-xs font-semibold text-[#ffe169] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                title="Launch a Hawai Sky Rocket"
+              >
+                🚀 Rocket
               </button>
 
               <div className="h-4 w-[1px] bg-[#f1aa49]/25 mx-0.5 hidden sm:block" />
 
               {/* Quick Teleport Pills */}
               <button
+                onClick={() => engineRef.current?.teleportTo('food-gola')}
+                className="px-2.5 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                Gola &amp; Choodi
+              </button>
+              <button
                 onClick={() => engineRef.current?.teleportTo('food-mithai')}
                 className="px-2.5 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                Mithai & Chaat
-              </button>
-              <button
-                onClick={() => engineRef.current?.teleportTo('game-balloon')}
-                className="px-2.5 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-              >
-                Games
+                Mithai &amp; Chaat
               </button>
               <button
                 onClick={() => engineRef.current?.teleportTo('game-diya')}
                 className="px-2.5 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                7 Diyas Mandap
+                7 Diyas &amp; Aarti
               </button>
+
               <button
                 onClick={() => {
                   const spec = engineRef.current?.interactables.find((s) => s.type === 'rangoli');

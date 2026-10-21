@@ -209,6 +209,30 @@ export class MelaEngine {
   // Mela Crowd Visitors (roaming, sitting & eating, standing at shops)
   private crowdVisitors: MelaCrowdVisitor[] = [];
 
+  // Mandir Ghanti (Temple Bell) & Interactive Maha-Aarti Thali at 7 Diyas Mandap
+  private mandapBellPivot: THREE.Group | null = null;
+  private mandapBellTimer = 0;
+  private mandapAartiThali: THREE.Group | null = null;
+  private mandapAartiBasePos = new THREE.Vector3(0, 1.08, 3.95);
+  private mandapAartiTimer = 0;
+
+  // Interactive 3D Ground Crackers (Anaar, Chakri, Sky Rocket)
+  private groundCrackers: {
+    group: THREE.Group;
+    wheelMesh?: THREE.Object3D;
+    kind: 'anaar' | 'chakri' | 'rocket';
+    activeTimer: number;
+    basePos: THREE.Vector3;
+  }[] = [];
+
+  // Floating Personalized Wish Sky Lanterns
+  private wishLanterns: {
+    group: THREE.Group;
+    vy: number;
+    phase: number;
+  }[] = [];
+
+
 
   // Activity / Cinematic timers
   private entryStartTime = 0;
@@ -626,6 +650,11 @@ export class MelaEngine {
     this.rangoliBowls = [];
     this.rangoliGroup = null;
     this.crowdVisitors = [];
+    this.mandapBellPivot = null;
+    this.mandapAartiThali = null;
+    this.groundCrackers = [];
+    this.wishLanterns = [];
+
 
 
     for (const spec of this.interactables) {
@@ -680,7 +709,11 @@ export class MelaEngine {
 
     // Populate the fairground with lively crowds: roaming families, people sitting & eating chaat/jalebi, and shoppers standing at stalls
     this.buildMelaCrowdsAndTables();
+
+    // Build Interactive Patakha Chबूतरा (Click-to-light Anaar, Chakri & Rocket pad in the bazaar plaza)
+    this.buildInteractivePatakhaPad(5.8, 1.5);
   }
+
 
 
   private createClayDiyaMesh(scale = 1, lit = true): { group: THREE.Group; flame: THREE.Object3D } {
@@ -830,7 +863,53 @@ export class MelaEngine {
     // Counter Props based on stall type
     const propGroup = new THREE.Group();
     propGroup.position.set(0, 1.08, 0.6);
-    if (spec.type === 'food') {
+    if (spec.id === 'food-gola' || spec.id === 'food-kulfi') {
+      // Traditional Red-Cloth Wrapped Matka Kulfi Pot & Rainbow Kala Khatta Syrup Bottles
+      const redClothMat = new THREE.MeshStandardMaterial({ color: 0xc9182b, roughness: 0.65 });
+      const matka = new THREE.Mesh(new THREE.SphereGeometry(0.38, 14, 12), redClothMat);
+      matka.position.set(-0.85, 0.34, 0);
+      const matkaNeck = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.16, 12), goldMat);
+      matkaNeck.position.set(-0.85, 0.68, 0);
+      propGroup.add(matka, matkaNeck);
+
+      const syrupColors = [0xff1744, 0x00e676, 0xffea00, 0xd500f9, 0xff6d00];
+      for (let b = 0; b < syrupColors.length; b++) {
+        const bottle = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.06, 0.075, 0.34, 10),
+          new THREE.MeshStandardMaterial({
+            color: syrupColors[b],
+            emissive: syrupColors[b],
+            emissiveIntensity: 0.25,
+            roughness: 0.2,
+          })
+        );
+        bottle.position.set(0.15 + b * 0.26, 0.17, 0.1);
+        propGroup.add(bottle);
+      }
+    } else if (spec.id === 'stall-bangles') {
+      // Glittering Firozabad Glass Bangles (Choodiyan) Racks in Red, Green, Gold & Pink
+      const bangleColors = [0xff1744, 0xffd600, 0x00c853, 0xff4081, 0x00b0ff];
+      for (let r = -1; r <= 1; r++) {
+        const standRod = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.9, 10), goldMat);
+        standRod.rotation.z = Math.PI / 2;
+        standRod.position.set(r * 1.05, 0.38, 0);
+        propGroup.add(standRod);
+
+        for (let c = -3; c <= 3; c++) {
+          const bangle = new THREE.Mesh(
+            new THREE.TorusGeometry(0.11, 0.022, 8, 16),
+            new THREE.MeshStandardMaterial({
+              color: bangleColors[Math.abs(c + r * 2) % bangleColors.length],
+              metalness: 0.65,
+              roughness: 0.2,
+            })
+          );
+          bangle.rotation.y = Math.PI / 2;
+          bangle.position.set(r * 1.05 + c * 0.08, 0.38, 0);
+          propGroup.add(bangle);
+        }
+      }
+    } else if (spec.type === 'food') {
       // Tiers of golden laddoos / jalebis / matkas
       const plateMat = new THREE.MeshStandardMaterial({ color: 0xe6c27a, roughness: 0.25, metalness: 0.85 });
       const sweetMat = new THREE.MeshStandardMaterial({ color: 0xff9914, roughness: 0.45 });
@@ -866,6 +945,7 @@ export class MelaEngine {
         propGroup.add(urli);
       }
     }
+
     group.add(propGroup);
 
     // Shopkeeper inside the stall
@@ -1014,10 +1094,70 @@ export class MelaEngine {
       });
     }
 
+    // 8. Ornate Archway with Hanging Brass Temple Bell (Mandir Ghanti)
+    for (const side of [-1, 1]) {
+      const archPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 4.4, 12), goldMat);
+      archPillar.position.set(side * 1.85, 2.38, 3.85);
+      mandap.add(archPillar);
+    }
+    const archBeam = new THREE.Mesh(new THREE.BoxGeometry(4.1, 0.22, 0.26), goldMat);
+    archBeam.position.set(0, 4.55, 3.85);
+    mandap.add(archBeam);
+
+    const bellPivot = new THREE.Group();
+    bellPivot.position.set(0, 4.48, 3.85);
+    const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.55, 8), goldMat);
+    chain.position.y = -0.27;
+    const bellDome = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.38, 0.48, 16), goldMat);
+    bellDome.position.y = -0.72;
+    const bellRim = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.045, 10, 20), goldMat);
+    bellRim.rotation.x = Math.PI / 2;
+    bellRim.position.y = -0.95;
+    const clapper = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 10), goldMat);
+    clapper.position.y = -1.02;
+    // Invisible click target around the Brass Bell
+    const bellHitbox = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.75, 0.75, 1.4, 10),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    bellHitbox.position.y = -0.7;
+    bellHitbox.userData.isMandapBell = true;
+    bellPivot.add(chain, bellDome, bellRim, clapper, bellHitbox);
+    mandap.add(bellPivot);
+    this.mandapBellPivot = bellPivot;
+
+    // 9. Interactive Golden Maha-Aarti Thali on Front Pedestal
+    const aartiPedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.52, 0.72, 14), crimsonMat);
+    aartiPedestal.position.set(0, 0.72, 3.95);
+    mandap.add(aartiPedestal);
+
+    const aartiThaliGroup = new THREE.Group();
+    aartiThaliGroup.position.copy(this.mandapAartiBasePos);
+    const thaliPlate = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.32, 0.05, 18), goldMat);
+    const { group: aartiDiya, flame: aartiFlame } = this.createClayDiyaMesh(0.75, true);
+    aartiDiya.position.set(0, 0.04, 0.08);
+    this.flameMeshes.push(aartiFlame);
+    const kalashLota = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 10), goldMat);
+    kalashLota.position.set(-0.16, 0.1, -0.08);
+    const kumkumKatori = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.06, 0.05, 10),
+      new THREE.MeshStandardMaterial({ color: 0xe63946, roughness: 0.5 })
+    );
+    kumkumKatori.position.set(0.16, 0.05, -0.08);
+    const aartiHitbox = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.75, 0.75, 0.9, 10),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    aartiHitbox.userData.isMandapAarti = true;
+    aartiThaliGroup.add(thaliPlate, aartiDiya, kalashLota, kumkumKatori, aartiHitbox);
+    mandap.add(aartiThaliGroup);
+    this.mandapAartiThali = aartiThaliGroup;
+
     this.stats.diyasLit = this.mandapDiyas.filter((d) => d.lit).length;
     this.addContactShadow(mandap, 11, 11);
     this.dynamicRoot.add(mandap);
   }
+
 
   private buildDaanPeti(spec: MelaInteractableSpec): void {
     const group = new THREE.Group();
@@ -1996,17 +2136,22 @@ export class MelaEngine {
           this.handleRingToss(e.clientX, e.clientY);
         } else if (this.mode === 'diya-game') {
           if (!this.checkDaanPetiClick(e.clientX, e.clientY)) {
-            this.handleDiyaTap(e.clientX, e.clientY);
+            if (!this.checkSpecialInteractablesClick(e.clientX, e.clientY)) {
+              this.handleDiyaTap(e.clientX, e.clientY);
+            }
           }
         } else if (this.mode === 'rangoli') {
           this.handleRangoliTap(e.clientX, e.clientY);
         } else if (this.mode === 'walk') {
           if (!this.checkDaanPetiClick(e.clientX, e.clientY)) {
             if (!this.checkRangoliClick(e.clientX, e.clientY)) {
-              this.checkCrowdClick(e.clientX, e.clientY);
+              if (!this.checkSpecialInteractablesClick(e.clientX, e.clientY)) {
+                this.checkCrowdClick(e.clientX, e.clientY);
+              }
             }
           }
         }
+
       } else if (this.mode === 'ring' && dragDy > 24) {
 
         this.handleRingToss(e.clientX, e.clientY);
@@ -2699,6 +2844,10 @@ export class MelaEngine {
 
     // 6b. Mela Crowd Visitors (roaming, sitting & eating, standing at shops, and greeting waves)
     this.updateCrowdAnimations(dt);
+
+    // 6c. Mandir Ghanti, Maha-Aarti Thali, Ground Crackers (Anaar/Chakri) & Floating Wish Lanterns
+    this.updateSpecialFestiveAnimations(dt);
+
 
 
     // 7. Ring Toss flight animation
@@ -4219,6 +4368,385 @@ export class MelaEngine {
     }
   }
 
+  // --- MANDIR GHANTI, MAHA-AARTI THALI, GROUND PATAKHE (ANAAR/CHAKRI/ROCKET) & WISH LANTERNS ---
+
+  private buildInteractivePatakhaPad(cx: number, cz: number): void {
+    const padGroup = new THREE.Group();
+    padGroup.position.set(cx, 0, cz);
+
+    const stoneMat = new THREE.MeshStandardMaterial({ color: 0x2a1c2d, roughness: 0.78 });
+    const brassMat = new THREE.MeshStandardMaterial({ color: 0xf4b855, roughness: 0.3, metalness: 0.82 });
+    const anaarMat = new THREE.MeshStandardMaterial({
+      color: 0xe63946,
+      emissive: 0x551118,
+      roughness: 0.35,
+      metalness: 0.2,
+    });
+    const chakriMat = new THREE.MeshStandardMaterial({
+      color: 0x06d6a0,
+      emissive: 0x044432,
+      roughness: 0.3,
+      metalness: 0.3,
+    });
+    const rocketMat = new THREE.MeshStandardMaterial({
+      color: 0xffbe0b,
+      emissive: 0x553800,
+      roughness: 0.3,
+      metalness: 0.4,
+    });
+
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.5, 0.16, 24), stoneMat);
+    base.position.y = 0.08;
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(2.32, 0.05, 10, 32), brassMat);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = 0.16;
+    padGroup.add(base, rim);
+
+    // 1. Clickable 3D Anaar (Flowerpot Fountain) on Left
+    const anaarGroup = new THREE.Group();
+    anaarGroup.position.set(cx - 0.95, 0.16, cz + 0.25);
+    const anaarCone = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.72, 14), anaarMat);
+    anaarCone.position.y = 0.36;
+    const anaarGoldBand = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.14, 14), brassMat);
+    anaarGoldBand.position.y = 0.34;
+    const anaarHit = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.65, 0.65, 1.2, 10),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    anaarHit.position.y = 0.5;
+    anaarGroup.add(anaarCone, anaarGoldBand, anaarHit);
+    this.dynamicRoot.add(anaarGroup);
+    this.groundCrackers.push({
+      group: anaarGroup,
+      kind: 'anaar',
+      activeTimer: 2.5, // Starts sparkling on load for visual delight!
+      basePos: anaarGroup.position.clone(),
+    });
+
+    // 2. Clickable 3D Chakri (Spinning Ground Wheel) in Center
+    const chakriGroup = new THREE.Group();
+    chakriGroup.position.set(cx, 0.2, cz + 0.55);
+    const wheelMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.07, 16), chakriMat);
+    const innerSpiral = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.035, 8, 16), brassMat);
+    innerSpiral.rotation.x = Math.PI / 2;
+    innerSpiral.position.y = 0.04;
+    wheelMesh.add(innerSpiral);
+    const chakriHit = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.68, 0.68, 0.9, 10),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    chakriHit.position.y = 0.3;
+    chakriGroup.add(wheelMesh, chakriHit);
+    this.dynamicRoot.add(chakriGroup);
+    this.groundCrackers.push({
+      group: chakriGroup,
+      wheelMesh,
+      kind: 'chakri',
+      activeTimer: 0,
+      basePos: chakriGroup.position.clone(),
+    });
+
+    // 3. Clickable 3D Sky Rocket (Hawai Rocket in Brass Bottle) on Right
+    const rocketGroup = new THREE.Group();
+    rocketGroup.position.set(cx + 0.95, 0.16, cz + 0.25);
+    const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.16, 0.46, 12), brassMat);
+    bottle.position.y = 0.23;
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.95, 8), brassMat);
+    stick.position.y = 0.58;
+    const rocketHead = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.42, 12), rocketMat);
+    rocketHead.position.y = 1.08;
+    const rocketHit = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.65, 0.65, 1.5, 10),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    rocketHit.position.y = 0.65;
+    rocketGroup.add(bottle, stick, rocketHead, rocketHit);
+    this.dynamicRoot.add(rocketGroup);
+    this.groundCrackers.push({
+      group: rocketGroup,
+      kind: 'rocket',
+      activeTimer: 0,
+      basePos: rocketGroup.position.clone(),
+    });
+
+    // Signboard above Patakha Pad
+    const signTex = createSignboardTexture(
+      this.renderer,
+      '🎇 पटाखा ज़ोन · CLICK TO LIGHT!',
+      'Tap Anaar (Fountain) · Chakri (Spinner) · Sky Rocket',
+      '#3d101b',
+      '#ffd27d',
+      '#fff5de'
+    );
+    const signMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.8, 0.64),
+      new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide })
+    );
+    signMesh.position.set(0, 1.85, -0.75);
+    padGroup.add(signMesh);
+
+    this.addContactShadow(padGroup, 5.2, 5.2);
+    this.dynamicRoot.add(padGroup);
+  }
+
+  public ringMandapBell(): void {
+    this.mandapBellTimer = 3.8;
+    this.audio.effect('bell');
+    this.spawnFireworkBurst(0, 4.2, -6.15, 26, 0xffd269);
+    this.collectItem('Mandir Ghanti Aashirwad');
+    this.callbacks.onToast('🔔 टन-टन! Mandir Ghanti rung! Shubh Deepavali blessings!');
+  }
+
+  public performMahaAarti(): void {
+    this.mandapAartiTimer = 6.0;
+    this.mandapBellTimer = 4.2;
+    this.audio.effect('bell');
+    this.audio.speak('Om Jai Lakshmi Mata! Shubh Deepavali Maha Aarti Aashirwad!');
+    this.spawnFireworkBurst(0, 2.2, -6.5, 36, 0xffbe42);
+    this.collectItem('Maa Lakshmi Shubh-Labh Aashirwad');
+    this.callbacks.onToast('🪔 Performing Lakshmi-Ganesh Maha-Aarti! "Shubh-Labh Aashirwad" added to your Mela Bag!');
+  }
+
+  public lightGroundCracker(kind: 'anaar' | 'chakri' | 'rocket'): void {
+    const cracker = this.groundCrackers.find((c) => c.kind === kind);
+    const cx = cracker ? cracker.basePos.x : this.player.x;
+    const cz = cracker ? cracker.basePos.z : this.player.z - 3.5;
+
+    if (cracker) {
+      cracker.activeTimer = kind === 'rocket' ? 1.8 : 5.5;
+    }
+
+    if (kind === 'anaar') {
+      this.audio.effect('sparkle');
+      this.spawnFireworkBurst(cx, 1.4, cz, 45, 0xffaa33);
+      this.collectItem('Golden Anaar Fountain');
+      this.callbacks.onToast('🎇 Golden Anaar Fountain lit! Watch the sparkling flowerpot!');
+    } else if (kind === 'chakri') {
+      this.audio.effect('sparkle');
+      this.spawnFireworkBurst(cx, 0.4, cz, 40, 0x06d6a0);
+      this.collectItem('Satrangi Ground Chakri');
+      this.callbacks.onToast('🌀 Ground Chakri spinning! Look at the emerald & gold spiral sparks!');
+    } else {
+      this.audio.effect('firework');
+      this.spawnFireworkBurst(cx, 1.2, cz, 24, 0xffd166);
+      this.spawnFireworkBurst(cx + (Math.random() - 0.5) * 3, 16, cz - 2, 95, 0xff4d6d);
+      this.spawnFireworkBurst(cx, 18, cz - 2, 85, 0xffbe0b);
+      this.collectItem('Aasmani Hawai Rocket');
+      this.callbacks.onToast('🚀 Hawai Sky Rocket launched high into the Diwali night sky!');
+    }
+  }
+
+  public launchWishLantern(senderName: string, wishText: string): void {
+    const cleanName = (senderName || 'Diwali Friend').trim().slice(0, 26);
+    const cleanWish = (wishText || 'Shubh Deepavali! Sukh, Shanti & Samriddhi!').trim().slice(0, 56);
+
+    const group = new THREE.Group();
+    // Spawn 4.2m in front of the player so they can watch it float up immediately
+    const spawnX =
+      this.mode === 'walk' ? this.player.x - Math.sin(this.player.yaw) * 4.2 : 0;
+    const spawnZ =
+      this.mode === 'walk' ? this.player.z - Math.cos(this.player.yaw) * 4.2 : -18;
+    group.position.set(spawnX, 1.65, spawnZ);
+
+    const lanternMat = new THREE.MeshBasicMaterial({ color: 0xffaa33 });
+    const lanternBody = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.32, 1.18, 14), lanternMat);
+    group.add(lanternBody);
+
+    const glowSprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: this.glowTexture,
+        color: 0xffd27d,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    glowSprite.scale.set(2.4, 2.4, 1);
+    group.add(glowSprite);
+
+    // Floating Banner Card below the Wish Sky Lantern
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 160;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = 'rgba(36, 12, 24, 0.92)';
+    ctx.strokeStyle = '#ffcf66';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(10, 10, 492, 140);
+    ctx.fillRect(10, 10, 492, 140);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd27d';
+    ctx.font = 'bold 26px sans-serif';
+    ctx.fillText(`🪔 ${cleanName}'s Akashdeep Wish`, 256, 58);
+    ctx.fillStyle = '#fff6de';
+    ctx.font = '22px sans-serif';
+    ctx.fillText(`"${cleanWish}"`, 256, 108);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const labelSprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false })
+    );
+    labelSprite.scale.set(2.8, 0.88, 1);
+    labelSprite.position.set(0, -1.15, 0);
+    labelSprite.renderOrder = 30;
+    group.add(labelSprite);
+
+    this.dynamicRoot.add(group);
+    this.wishLanterns.push({
+      group,
+      vy: 1.35,
+      phase: Math.random() * Math.PI * 2,
+    });
+
+    this.audio.effect('sparkle');
+    this.spawnFireworkBurst(spawnX, 2.0, spawnZ, 36, 0xffd27d);
+    this.collectItem(`Akashdeep Wish (${cleanName})`);
+    this.callbacks.onToast(`🏮 ${cleanName}'s Wish Sky Lantern is rising into the starry Diwali sky!`);
+  }
+
+  private checkSpecialInteractablesClick(clientX: number, clientY: number): boolean {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.pointerNDC, this.camera);
+
+    // 1. Check Mandir Ghanti (Temple Bell) & Maha-Aarti Thali
+    const mandapTargets: THREE.Object3D[] = [];
+    if (this.mandapBellPivot) mandapTargets.push(this.mandapBellPivot);
+    if (this.mandapAartiThali) mandapTargets.push(this.mandapAartiThali);
+
+    if (mandapTargets.length > 0) {
+      const hits = this.raycaster.intersectObjects(mandapTargets, true);
+      if (hits.length > 0 && hits[0].distance < 26) {
+        let obj: THREE.Object3D | null = hits[0].object;
+        while (obj) {
+          if (obj === this.mandapBellPivot || obj.userData?.isMandapBell) {
+            this.ringMandapBell();
+            return true;
+          }
+          if (obj === this.mandapAartiThali || obj.userData?.isMandapAarti) {
+            this.performMahaAarti();
+            return true;
+          }
+          obj = obj.parent;
+        }
+      }
+    }
+
+    // 2. Check Interactive 3D Ground Crackers (Anaar, Chakri, Sky Rocket)
+    if (this.groundCrackers.length > 0) {
+      const crackerGroups = this.groundCrackers.map((c) => c.group);
+      const hits = this.raycaster.intersectObjects(crackerGroups, true);
+      if (hits.length > 0 && hits[0].distance < 28) {
+        const hitObj = hits[0].object;
+        const found = this.groundCrackers.find((c) => {
+          let curr: THREE.Object3D | null = hitObj;
+          while (curr) {
+            if (curr === c.group) return true;
+            curr = curr.parent;
+          }
+          return false;
+        });
+        if (found) {
+          this.lightGroundCracker(found.kind);
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  private updateSpecialFestiveAnimations(dt: number): void {
+    const t = this.elapsed;
+
+    // 1. Swinging Brass Temple Bell (Mandir Ghanti)
+    if (this.mandapBellPivot) {
+      if (this.mandapBellTimer > 0) {
+        this.mandapBellTimer = Math.max(0, this.mandapBellTimer - dt);
+        const damping = this.mandapBellTimer / 3.8;
+        this.mandapBellPivot.rotation.z = Math.sin(t * 14) * 0.48 * damping;
+      } else {
+        this.mandapBellPivot.rotation.z = Math.sin(t * 1.5) * 0.03;
+      }
+    }
+
+    // 2. Circular Sacred Orbit of the Golden Maha-Aarti Thali
+    if (this.mandapAartiThali) {
+      if (this.mandapAartiTimer > 0) {
+        this.mandapAartiTimer = Math.max(0, this.mandapAartiTimer - dt);
+        const angle = t * 4.2;
+        const radius = 0.52;
+        this.mandapAartiThali.position.set(
+          this.mandapAartiBasePos.x + Math.cos(angle) * radius,
+          this.mandapAartiBasePos.y + 0.55 + Math.sin(angle) * radius,
+          this.mandapAartiBasePos.z + 0.25
+        );
+        if (Math.random() < 0.45) {
+          this.spawnFireworkBurst(
+            this.mandapAartiThali.position.x,
+            this.mandapAartiThali.position.y + 0.15,
+            this.mandapAartiThali.position.z - 10,
+            2,
+            0xffd27d
+          );
+        }
+      } else {
+        this.mandapAartiThali.position.copy(this.mandapAartiBasePos);
+      }
+    }
+
+    // 3. Active Ground Crackers (Anaar Fountain, Spinning Chakri & Rocket)
+    for (const c of this.groundCrackers) {
+      if (c.activeTimer > 0) {
+        c.activeTimer = Math.max(0, c.activeTimer - dt);
+        if (c.kind === 'anaar') {
+          // Erupt continuous golden-pink fountain sparks upward
+          if (Math.random() < 0.85) {
+            this.spawnFireworkBurst(
+              c.basePos.x + (Math.random() - 0.5) * 0.2,
+              c.basePos.y + 0.85,
+              c.basePos.z + (Math.random() - 0.5) * 0.2,
+              4,
+              Math.random() < 0.5 ? 0xffbe0b : 0xff4d6d
+            );
+          }
+        } else if (c.kind === 'chakri') {
+          // Spin wheel rapidly on ground & shoot spiral emerald-gold sparks
+          if (c.wheelMesh) {
+            c.wheelMesh.rotation.y += dt * 24;
+          }
+          c.group.position.x = c.basePos.x + Math.cos(t * 7) * 0.35;
+          c.group.position.z = c.basePos.z + Math.sin(t * 7) * 0.35;
+          if (Math.random() < 0.85) {
+            this.spawnFireworkBurst(
+              c.group.position.x,
+              c.group.position.y + 0.12,
+              c.group.position.z,
+              3,
+              Math.random() < 0.5 ? 0x06d6a0 : 0xffea00
+            );
+          }
+          if (c.activeTimer <= 0) {
+            c.group.position.copy(c.basePos);
+          }
+        }
+      }
+    }
+
+    // 4. Ascending Personalized Wish Sky Lanterns
+    for (let i = this.wishLanterns.length - 1; i >= 0; i--) {
+      const wl = this.wishLanterns[i];
+      wl.group.position.y += wl.vy * dt;
+      wl.group.position.x += Math.sin(t * 0.9 + wl.phase) * 0.35 * dt;
+      if (wl.group.position.y > 68) {
+        this.dynamicRoot.remove(wl.group);
+        this.wishLanterns.splice(i, 1);
+      }
+    }
+  }
+
   public dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.frameId);
@@ -4228,4 +4756,5 @@ export class MelaEngine {
     this.renderer.dispose();
   }
 }
+
 
