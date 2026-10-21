@@ -12,6 +12,8 @@ export type InteractableType =
   | 'carousel'
   | 'pirate-ship'
   | 'well'
+  | 'stage'
+  | 'daan-peti'
   | 'photo'
   | 'fireworks'
   | 'finale';
@@ -68,7 +70,7 @@ export const STALL_SLOTS: StallSlot[] = [
   { id: 'bazaar-east', name: 'Diwali Bazaar · Right Lane', x: 12, z: 4, rotY: -Math.PI / 2 },
   { id: 'rides-west', name: 'Towards Rides · Left Lane', x: -12, z: -16, rotY: Math.PI / 2 },
   { id: 'rides-east', name: 'Towards Rides · Right Lane', x: 12, z: -16, rotY: -Math.PI / 2 },
-  { id: 'mandap-west', name: 'Near Deepotsav Mandap · West', x: -18, z: -34, rotY: Math.PI / 3 },
+  { id: 'mandap-west', name: 'Near Deepotsav Stage · West', x: -18, z: -34, rotY: Math.PI / 3 },
   { id: 'wheel-east', name: 'Near Giant Wheel · East', x: 18, z: -34, rotY: -Math.PI / 3 },
 ];
 
@@ -392,8 +394,22 @@ export const CORE_MELA_ATTRACTIONS: MelaInteractableSpec[] = [
     greeting: 'Aaiye! Maha-Rangoli ke charon taraf 7 mitti ke diyon ko prajwalit karein aur Deepotsav Aashirwad praapt karein.',
     description: 'Tap each of the 7 earthen diyas around the central Rangoli Mandap to light their golden flames.',
   },
+  {
+    id: 'daan-peti',
+    name: 'Seva Daan Peti · Charity Donation Box',
+    hindiSub: 'सेवा दान पेटी • किसी गरीब के घर भी जले खुशियों का दीया',
+    type: 'daan-peti',
+    x: 5.6,
+    z: -8.2,
+    rotY: -Math.PI / 6,
+    theme: 'kesari',
+    greeting:
+      'Apne ghar ke diye toh har koi jalata hai, asli Diwali toh tab hai jab aapki wajah se kisi gareeb ke ghar chulha jal paata hai. Scan the QR code to bring warm food, mithai, and smiles to a family in need tonight!',
+    description:
+      'Traditional brass-bound Daan Peti next to the 7 Diyas Mandap. Click to scan the QR code and help underprivileged families celebrate Diwali.',
+  },
 
-  // Rides & Shows
+  // Rides & Cultural Stage
   {
     id: 'ride-wheel',
     name: 'Chand Wala Jhoola · Giant Wheel',
@@ -431,6 +447,18 @@ export const CORE_MELA_ATTRACTIONS: MelaInteractableSpec[] = [
     description: 'Swing high into the starry Diwali night aboard the giant Peacock Ship.',
   },
   {
+    id: 'stage-ramleela',
+    name: 'Ayodhya Deepotsav & Ram Leela Stage',
+    hindiSub: 'राम लीला और अयोध्या दीपोत्सव मंच',
+    type: 'stage',
+    x: -24,
+    z: -50,
+    rotY: Math.PI / 5,
+    theme: 'kesari',
+    greeting: 'Aaiye विराजे! Shri Ram ke Ayodhya aagman aur Deepotsav Leela ka shahi manchan dekhein.',
+    description: 'Watch the cultural Ram Leela & Ayodhya Deepotsav stage performance under the starry night.',
+  },
+  {
     id: 'ride-well',
     name: 'Maut Ka Kuan · Well of Death',
     hindiSub: 'मौत का कुआँ • देखो या खुद बाइक चलाओ!',
@@ -461,9 +489,9 @@ export const CORE_MELA_ATTRACTIONS: MelaInteractableSpec[] = [
     name: 'Roshni Ka Jashn · Sky Crackers',
     hindiSub: 'रोशनी का जश्न • अनार, चकरी और आतिशबाज़ी',
     type: 'fireworks',
-    x: -16,
+    x: 16,
     z: -50,
-    rotY: Math.PI / 6,
+    rotY: -Math.PI / 6,
     theme: 'neela',
     greeting: 'Sirf roshni, sirf khushi! Anar ke fawware, ghoomti chakri aur satrangi aasmani aatishbaazi shuru karein!',
     description: 'Ignite golden Anar fountains and multi-color aerial sky bursts over the fair.',

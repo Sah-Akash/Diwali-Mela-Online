@@ -25,6 +25,7 @@ export type MelaMode =
   | 'diya-game'
   | 'ride'
   | 'well'
+  | 'stage'
   | 'firework-show'
   | 'finale';
 
@@ -65,6 +66,7 @@ export interface MelaEngineCallbacks {
   onStatsChange: (stats: PlayerStats) => void;
   onToast: (msg: string) => void;
   onOpenPhotoCard: (dataUrl: string) => void;
+  onOpenDaanPeti: () => void;
 }
 
 // Pre-allocated math helpers outside the render loop (Zero GC in tick)
@@ -162,6 +164,7 @@ export class MelaEngine {
     willWin: boolean;
   } | null = null;
   private mandapDiyas: { group: THREE.Group; flame: THREE.Object3D; lit: boolean; index: number }[] = [];
+  private daanPetiCollider: THREE.Object3D | null = null;
 
   // Activity / Cinematic timers
   private entryStartTime = 0;
@@ -593,6 +596,9 @@ export class MelaEngine {
         case 'diya-game':
           this.buildDeepotsavMandap(spec);
           break;
+        case 'daan-peti':
+          this.buildDaanPeti(spec);
+          break;
         case 'wheel':
           this.buildFerrisWheel(spec);
           break;
@@ -604,6 +610,9 @@ export class MelaEngine {
           break;
         case 'well':
           this.buildWellOfDeath(spec);
+          break;
+        case 'stage':
+          this.buildCulturalStage(spec);
           break;
         case 'photo':
           this.buildPhotoBoothToran(spec);
@@ -954,6 +963,135 @@ export class MelaEngine {
     this.dynamicRoot.add(mandap);
   }
 
+  private buildDaanPeti(spec: MelaInteractableSpec): void {
+    const group = new THREE.Group();
+    group.position.set(spec.x, 0, spec.z);
+    group.rotation.y = spec.rotY;
+    group.userData.spec = spec;
+
+    const teakMat = new THREE.MeshStandardMaterial({ color: 0x5c2c16, roughness: 0.65, metalness: 0.15 });
+    const brassMat = new THREE.MeshStandardMaterial({ color: 0xf4b855, roughness: 0.24, metalness: 0.88 });
+    const crimsonMat = new THREE.MeshStandardMaterial({ color: 0x7a1c24, roughness: 0.55 });
+    const slotMat = new THREE.MeshBasicMaterial({ color: 0x090b10 });
+
+    // 1. Stepped Pedestal Base
+    const baseStep1 = new THREE.Mesh(new THREE.CylinderGeometry(1.45, 1.6, 0.25, 16), crimsonMat);
+    baseStep1.position.y = 0.125;
+    group.add(baseStep1);
+
+    const baseStep2 = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.3, 0.28, 16), brassMat);
+    baseStep2.position.y = 0.38;
+    group.add(baseStep2);
+
+    // 2. Main Carved Teakwood & Brass Donation Chest (Daan Peti)
+    const chestBody = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.15, 0.95), teakMat);
+    chestBody.position.y = 1.08;
+    chestBody.castShadow = true;
+    chestBody.receiveShadow = true;
+    group.add(chestBody);
+
+    // Brass Frame Bands around the Daan Peti
+    const topRim = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.12, 1.02), brassMat);
+    topRim.position.y = 1.62;
+    group.add(topRim);
+
+    const bottomRim = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.12, 1.02), brassMat);
+    bottomRim.position.y = 0.56;
+    group.add(bottomRim);
+
+    // Arched Vault Lid on top of Daan Peti
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 1.36, 16, 1, false, 0, Math.PI), brassMat);
+    lid.rotation.z = Math.PI / 2;
+    lid.position.y = 1.66;
+    group.add(lid);
+
+    // Coin / Note Slot on top
+    const coinSlot = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.06, 0.12), slotMat);
+    coinSlot.position.set(0, 2.11, 0);
+    group.add(coinSlot);
+
+    // Traditional Brass Padlock (Tala) on front
+    const lockPlate = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.32, 0.08), brassMat);
+    lockPlate.position.set(0, 1.18, 0.49);
+    group.add(lockPlate);
+
+    // Front Sign Plaque on the Chest
+    const frontSignTex = createSignboardTexture(
+      this.renderer,
+      'दान पेटी · DAAN PETI',
+      'असली दिवाली: किसी गरीब के घर जले खुशियों का दीया',
+      '#4f121d',
+      '#ffd27d',
+      '#fff6de'
+    );
+    const frontPlaque = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.18, 0.44),
+      new THREE.MeshBasicMaterial({ map: frontSignTex })
+    );
+    frontPlaque.position.set(0, 0.82, 0.485);
+    group.add(frontPlaque);
+
+    // Real Scannable QR Code Standee mounted on the Daan Peti
+    const qrFrame = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.86, 0.06), brassMat);
+    qrFrame.position.set(0, 2.22, 0.12);
+    group.add(qrFrame);
+
+    const qrTex = new THREE.TextureLoader().load(
+      '/assets/aistudio/WhatsApp_Image_2026-10-21_at_10.56.40_PM_a73914be.jpeg'
+    );
+    qrTex.colorSpace = THREE.SRGBColorSpace;
+    const qrPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.76, 0.76),
+      new THREE.MeshBasicMaterial({ map: qrTex })
+    );
+    qrPlane.position.set(0, 2.22, 0.155);
+    group.add(qrPlane);
+
+    // 3. Two Brass Pillars holding the overhead Daan Peti Arch Banner
+    for (const side of [-1, 1]) {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 3.1, 10), brassMat);
+      pole.position.set(side * 0.95, 1.8, -0.25);
+      group.add(pole);
+
+      // Flanking Lit Clay Diyas on the Pedestal
+      const { group: diya } = this.createClayDiyaMesh(0.75, true);
+      diya.position.set(side * 0.92, 0.52, 0.48);
+      group.add(diya);
+    }
+
+    const headerTex = createSignboardTexture(
+      this.renderer,
+      'सेवा दान पेटी · SCAN QR FOR SEVA',
+      'Click Box · Help Poor Families Celebrate Diwali 🪔',
+      '#3d101b',
+      '#f4b855',
+      '#fff5de'
+    );
+    const headerBoard = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.5, 0.68),
+      new THREE.MeshBasicMaterial({ map: headerTex, side: THREE.DoubleSide })
+    );
+    headerBoard.position.set(0, 3.18, -0.25);
+    group.add(headerBoard);
+
+    // Warm golden point light illuminating the Daan Peti & QR standee
+    const petiLight = new THREE.PointLight(0xffbb44, 6.5, 8.5);
+    petiLight.position.set(0, 2.4, 0.7);
+    group.add(petiLight);
+
+    // Invisible simplified proxy box for instant 3D click detection
+    const collider = new THREE.Mesh(
+      new THREE.BoxGeometry(2.5, 3.5, 2.1),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    collider.position.set(0, 1.75, 0);
+    group.add(collider);
+    this.daanPetiCollider = collider;
+
+    this.addContactShadow(group, 3.6, 3.6);
+    this.dynamicRoot.add(group);
+  }
+
   private buildFerrisWheel(spec: MelaInteractableSpec): void {
     const root = new THREE.Group();
     root.position.set(spec.x, 0, spec.z);
@@ -1230,6 +1368,78 @@ export class MelaEngine {
 
     this.addContactShadow(root, 16, 16);
     this.dynamicRoot.add(root);
+  }
+
+  private buildCulturalStage(spec: MelaInteractableSpec): void {
+    const stage = new THREE.Group();
+    stage.position.set(spec.x, 0, spec.z);
+    stage.rotation.y = spec.rotY;
+
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xf4b855, roughness: 0.25, metalness: 0.85 });
+    const crimsonMat = new THREE.MeshStandardMaterial({ color: 0x6e1423, roughness: 0.55 });
+    const canopyTex = createCanopyStripeTexture(this.renderer, '#dc8827', '#6e1423');
+    const roofMat = new THREE.MeshStandardMaterial({ map: canopyTex, roughness: 0.55 });
+
+    // Raised stage deck
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(10.5, 1.1, 6.2), crimsonMat);
+    deck.position.y = 0.55;
+    deck.receiveShadow = true;
+    stage.add(deck);
+
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(10.7, 0.16, 6.4), goldMat);
+    trim.position.y = 1.08;
+    stage.add(trim);
+
+    // 4 Ornate Stage Pillars
+    for (const [px, pz] of [
+      [-4.6, -2.5],
+      [4.6, -2.5],
+      [-4.6, 2.5],
+      [4.6, 2.5],
+    ]) {
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 5.2, 14), goldMat);
+      col.position.set(px, 3.7, pz);
+      stage.add(col);
+    }
+
+    // Royal Mandap Roof
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(7.2, 2.6, 4), roofMat);
+    roof.rotation.y = Math.PI / 4;
+    roof.position.y = 7.5;
+    stage.add(roof);
+
+    // Backdrop Banner
+    const backdropTex = createSignboardTexture(
+      this.renderer,
+      'अयोध्या दीपोत्सव · RAM LEELA',
+      'Shri Ram Rajyabhishek & Deepotsav Cultural Stage',
+      '#3b0c18',
+      '#ffd27d',
+      '#fff6de'
+    );
+    const backdrop = new THREE.Mesh(
+      new THREE.PlaneGeometry(8.8, 3.6),
+      new THREE.MeshBasicMaterial({ map: backdropTex })
+    );
+    backdrop.position.set(0, 3.4, -2.35);
+    stage.add(backdrop);
+
+    // 3 Royal Performers on Stage + Diyas along the front footlights
+    const colors = [0xff9933, 0xe62e6b, 0x17a589];
+    for (let i = -1; i <= 1; i++) {
+      const actor = this.createShopkeeper(colors[i + 1]);
+      actor.position.set(i * 1.6, 1.1, -0.4);
+      stage.add(actor);
+    }
+
+    for (let d = -4; d <= 4; d += 2) {
+      const { group: diya } = this.createClayDiyaMesh(0.85, true);
+      diya.position.set(d * 0.95, 1.12, 2.65);
+      stage.add(diya);
+    }
+
+    this.addContactShadow(stage, 12, 8);
+    this.dynamicRoot.add(stage);
   }
 
   private buildPhotoBoothToran(spec: MelaInteractableSpec): void {
@@ -1539,7 +1749,11 @@ export class MelaEngine {
         } else if (this.mode === 'ring') {
           this.handleRingToss(e.clientX, e.clientY);
         } else if (this.mode === 'diya-game') {
-          this.handleDiyaTap(e.clientX, e.clientY);
+          if (!this.checkDaanPetiClick(e.clientX, e.clientY)) {
+            this.handleDiyaTap(e.clientX, e.clientY);
+          }
+        } else if (this.mode === 'walk') {
+          this.checkDaanPetiClick(e.clientX, e.clientY);
         }
       } else if (this.mode === 'ring' && dragDy > 24) {
         this.handleRingToss(e.clientX, e.clientY);
@@ -1636,6 +1850,30 @@ export class MelaEngine {
       this.stats.items.push(itemName);
     }
     this.callbacks.onStatsChange({ ...this.stats });
+  }
+
+  private checkDaanPetiClick(clientX: number, clientY: number): boolean {
+    if (!this.daanPetiCollider) return false;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.pointerNDC, this.camera);
+
+    const hits = this.raycaster.intersectObject(this.daanPetiCollider, true);
+    if (hits.length > 0 && hits[0].distance < 22) {
+      this.audio.effect('bell');
+      this.spawnFireworkBurst(5.6, 2.1, -8.2, 24, 0xffd27d);
+      this.callbacks.onOpenDaanPeti();
+      return true;
+    }
+    return false;
+  }
+
+  public celebrateDaanPeti(): void {
+    this.audio.effect('bell');
+    this.audio.effect('cheer');
+    this.spawnFireworkBurst(5.6, 2.4, -8.2, 48, 0xffd27d);
+    this.collectItem('Seva Daan Peti · Diwali Charity Blessing');
   }
 
   public startMiniGame(gameMode: 'balloon' | 'ring' | 'diya-game', spec: MelaInteractableSpec): void {
@@ -1855,6 +2093,15 @@ export class MelaEngine {
   public setWellControl(verticalInput: number, boost: boolean): void {
     this.wellState.verticalInput = verticalInput;
     this.wellState.boost = boost;
+  }
+
+  public startStageShow(spec?: MelaInteractableSpec): void {
+    this.activeSpec = spec || this.interactables.find((s) => s.type === 'stage') || null;
+    this.rideTimer = 0;
+    this.rideDuration = 18;
+    this.collectItem('Ayodhya Deepotsav & Ram Leela Pass');
+    this.audio.effect('bell');
+    this.setMode('stage', this.activeSpec);
   }
 
   public startFireworkShow(spec?: MelaInteractableSpec): void {
@@ -2221,6 +2468,27 @@ export class MelaEngine {
             : `Dhamakedar! You grabbed ${w.score}/8 Golden Rings on the vertical wall!`;
         }
         this.callbacks.onGameUpdate({ ...this.gameState });
+      }
+      return;
+    }
+
+    if (this.mode === 'stage' && this.activeSpec) {
+      this.rideTimer += dt;
+      const progress = Math.min(1, this.rideTimer / this.rideDuration);
+      this.callbacks.onRideProgress(progress, 'Ayodhya Deepotsav & Ram Leela Stage');
+
+      const dist = 7.8;
+      const camX = this.activeSpec.x + Math.sin(this.activeSpec.rotY) * dist + Math.sin(t * 0.4) * 1.4;
+      const camZ = this.activeSpec.z + Math.cos(this.activeSpec.rotY) * dist;
+      this.camera.position.set(camX, 2.5, camZ);
+      this.camera.lookAt(this.activeSpec.x, 2.8, this.activeSpec.z);
+
+      if (Math.random() < 0.06) {
+        this.spawnFireworkBurst(this.activeSpec.x + (Math.random() - 0.5) * 8, 9 + Math.random() * 4, this.activeSpec.z - 2, 30, 0xffd27d);
+      }
+
+      if (progress >= 1) {
+        this.leaveActivity();
       }
       return;
     }

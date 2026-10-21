@@ -8,7 +8,6 @@ import {
   Volume2,
   VolumeX,
   ShoppingBag,
-  Sparkles,
   Camera,
   Compass,
   ChevronDown,
@@ -18,6 +17,10 @@ import {
   Store,
   Flame,
   Share2,
+  Music,
+  Play,
+  Pause,
+  Heart,
 } from 'lucide-react';
 import {
   MelaInteractableSpec,
@@ -25,6 +28,7 @@ import {
   loadCustomPartnerStalls,
   saveCustomPartnerStall,
 } from './data/melaData';
+import { DIWALI_RADIO_TRACKS } from './audio/melaAudio';
 import {
   CinematicBanner,
   GameHudState,
@@ -34,6 +38,7 @@ import {
 } from './three/MelaEngine';
 import { PostcardModal } from './components/PostcardModal';
 import { StallBuilderModal } from './components/StallBuilderModal';
+import { DaanPetiModal } from './components/DaanPetiModal';
 
 export default function App() {
   const canvasHostRef = useRef<HTMLDivElement | null>(null);
@@ -68,6 +73,19 @@ export default function App() {
   const [mapOpen, setMapOpen] = useState(false);
   const [bagOpen, setBagOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [radioOpen, setRadioOpen] = useState(false);
+  const [radioPlaying, setRadioPlaying] = useState(true);
+  const [radioTrackIdx, setRadioTrackIdx] = useState(0);
+  const [radioVolume, setRadioVolume] = useState(0.75);
+
+  const [communityDiyas, setCommunityDiyas] = useState(1084);
+  const [blessingsList, setBlessingsList] = useState<string[]>([
+    'Ghar mein sukh, shanti aur samriddhi bani rahe! — Sharma Family',
+    'Bachpan wale mele ki yaadein taaza ho gayin! Happy Diwali! — Aayan',
+    'May every home glow with warmth and kindness this Deepavali. — Meera',
+  ]);
+
   const [stallModal, setStallModal] = useState<'create' | 'directory' | null>(null);
   const [postcardSnapshot, setPostcardSnapshot] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
@@ -77,7 +95,7 @@ export default function App() {
   const [joyKnob, setJoyKnob] = useState({ x: 0, y: 0 });
   const joyOriginRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Player position synced at low frequency for Mini-Map arrow
+  // Player position synced at low frequency for Mini-Map arrow & Location HUD
   const [playerMapPos, setPlayerMapPos] = useState({ x: 0, z: 48, yaw: 0 });
 
   const showToast = (msg: string) => {
@@ -98,7 +116,7 @@ export default function App() {
       onModeChange: (newMode, spec) => {
         setMode(newMode);
         setActiveSpec(spec);
-        if (newMode !== 'ride' && newMode !== 'firework-show') {
+        if (newMode !== 'ride' && newMode !== 'firework-show' && newMode !== 'stage') {
           setRideProgress(null);
         }
       },
@@ -125,6 +143,9 @@ export default function App() {
       },
       onOpenPhotoCard: (dataUrl) => {
         setPostcardSnapshot(dataUrl);
+      },
+      onOpenDaanPeti: () => {
+        setSupportOpen(true);
       },
     });
 
@@ -160,6 +181,12 @@ export default function App() {
   }, []);
 
   const openConversation = (spec: MelaInteractableSpec) => {
+    if (spec.type === 'daan-peti') {
+      engineRef.current?.audio.effect('bell');
+      engineRef.current?.audio.speak(spec.greeting);
+      setSupportOpen(true);
+      return;
+    }
     setTalkSpec(spec);
     setTalkReply(spec.greeting);
     setBargainStage(0);
@@ -186,6 +213,24 @@ export default function App() {
     setAudioEnabled(enabled);
   };
 
+  const handleToggleRadioPlay = () => {
+    if (!engineRef.current) return;
+    const next = !radioPlaying;
+    setRadioPlaying(next);
+    engineRef.current.audio.setRadioPlaying(next);
+  };
+
+  const handleChangeRadioTrack = (idx: number) => {
+    if (!engineRef.current) return;
+    setRadioTrackIdx(idx);
+    engineRef.current.audio.setTrackIndex(idx);
+  };
+
+  const handleVolumeChange = (val: number) => {
+    setRadioVolume(val);
+    engineRef.current?.audio.setVolume(val);
+  };
+
   const handleToggleRun = () => {
     if (!engineRef.current) return;
     const next = !isRunning;
@@ -196,6 +241,16 @@ export default function App() {
   const handleToggleSparkler = () => {
     if (!engineRef.current) return;
     engineRef.current.toggleSparkler();
+  };
+
+  const handleDonateComplete = (amount: number, donorName: string, wish: string) => {
+    setCommunityDiyas((c) => c + 1);
+    const formattedWish = wish.trim()
+      ? `${wish.trim()} — ${donorName.trim() || 'A Seva Donor'}`
+      : `Donated ₹${amount} for Diwali Seva — ${donorName.trim() || 'A Seva Donor'}`;
+    setBlessingsList((prev) => [formattedWish, ...prev.slice(0, 6)]);
+    engineRef.current?.celebrateDaanPeti();
+    showToast(`Shubh Deepavali! Thank you for your ₹${amount} Seva Daan for families in need!`);
   };
 
   // Touch / Mouse Joystick handlers
@@ -229,6 +284,16 @@ export default function App() {
 
   const allInteractables = engineRef.current?.interactables || [];
 
+  const currentZoneLabel = nearSpec
+    ? nearSpec.name
+    : playerMapPos.z > 20
+    ? 'Shubh Deepavali Entrance & Toran'
+    : playerMapPos.z > 0
+    ? 'Mithai & Chaat Bazaar Gali'
+    : playerMapPos.z > -24
+    ? 'Deepotsav Mandap & Jhoolon Ki Roshni'
+    : 'Ram Leela, Maut Ka Kuan & 1008 Akashdeep Maidan';
+
   return (
     <div className="relative w-screen h-screen overflow-hidden select-none bg-[#0e1525]">
       {/* Dedicated Empty WebGL Canvas Mount Container (Zero Viewport Occlusion) */}
@@ -259,31 +324,31 @@ export default function App() {
             }}
             className="hover:text-[#fff5de] hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
-            Bazaar Map
+            Mela Map
+          </button>
+          <button
+            onClick={() => setRadioOpen((prev) => !prev)}
+            className="hover:text-[#fff5de] hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            Bhajans & Radio
           </button>
           <button
             onClick={() => setBagOpen(true)}
             className="hover:text-[#fff5de] hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
-            Mela Jhola ({stats.items.length})
-          </button>
-          <button
-            onClick={() => setStallModal('directory')}
-            className="hover:text-[#fff5de] hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            Partner Stalls
+            Mela Bag ({stats.items.length})
           </button>
           <button
             onClick={() => setStallModal('create')}
             className="hover:text-[#fff5de] hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
-            Place Your Stall
+            Promote Your Shop
           </button>
           <button
-            onClick={() => setHelpOpen(true)}
+            onClick={() => setSupportOpen(true)}
             className="hover:text-[#fff5de] hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
-            Controls
+            Daan Peti QR
           </button>
         </nav>
 
@@ -294,7 +359,7 @@ export default function App() {
               onClick={() => engineRef.current?.enterMela()}
               className="px-4 py-2 text-xs font-semibold text-[#121726] bg-[#f1aa49] rounded-lg hover:bg-[#ffbe61] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
-              Enter 3D Mela →
+              Enter Diwali Mela →
             </button>
           ) : (
             <button
@@ -307,114 +372,136 @@ export default function App() {
         </div>
       </header>
 
-      {/* WELCOME / ENTRY HERO OVERLAY */}
+      {/* WELCOME / ENTRY SCREEN (Matches mela-chaloge.vercel.app layout & poetry for Diwali) */}
       {mode === 'welcome' && (
-        <main className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 pt-16 pb-10 pointer-events-auto">
-          <div className="w-full max-w-2xl rounded-2xl bg-[#10182b]/95 border border-[#f1aa49]/40 p-7 sm:p-9 shadow-2xl text-center">
-            <div className="flex items-center justify-center gap-2 text-xs font-medium tracking-wider text-[#f1aa49] mb-3">
-              <span>SHUBH DEEPAVALI 2026</span>
-              <span aria-hidden="true">·</span>
-              <span>MADE FOR THE CHILD IN YOU</span>
-              <span aria-hidden="true">·</span>
-              <span>EVERY GAME IS FREE</span>
+        <main
+          className="fixed inset-0 z-10 flex flex-col justify-between pt-20 pb-8 px-6 sm:px-14 pointer-events-none"
+          style={{
+            background:
+              'linear-gradient(90deg, rgba(11, 20, 35, 0.90) 0%, rgba(11, 20, 35, 0.62) 52%, rgba(11, 20, 35, 0.08) 85%), linear-gradient(0deg, rgba(11, 18, 32, 0.82) 0%, transparent 38%)',
+          }}
+        >
+          {/* Welcome Top Strip */}
+          <div className="flex items-center justify-between text-xs tracking-widest text-[#e2c395]">
+            <span className="text-sm sm:text-base font-medium tracking-wide text-[#f6dec0]">
+              एक शाम, बचपन के नाम
+            </span>
+            <span>DIWALI 2026 · शुभ दीपावली</span>
+          </div>
+
+          {/* Left Editorial Hero Copy */}
+          <div className="max-w-xl my-auto pointer-events-auto">
+            <div className="text-[11px] font-semibold tracking-[0.24em] text-[#f0c27e] mb-3">
+              THE DIWALI MELA IS OPEN · EVERY GAME IS FREE
             </div>
 
             <h1
-              className="text-3xl sm:text-5xl font-display font-bold text-[#fff6e0] tracking-tight mb-4"
-              style={{ textWrap: 'balance' }}
+              className="font-display font-medium text-[#fff6e0] leading-[1.08] tracking-tight mb-4"
+              style={{ fontSize: 'clamp(2.75rem, 5.2vw, 4.75rem)', textWrap: 'balance' }}
             >
-              Diwali Mela <em className="font-normal text-[#f1aa49]">chaloge mere sath?</em>
+              मेरा
+              <br />
+              <em className="font-normal text-[#f1c17d]">Diwali Mela.</em>
             </h1>
 
-            <p className="text-sm sm:text-base text-[#dfcba8] leading-relaxed max-w-xl mx-auto mb-6">
-              Step inside a glowing 3D Indian nighttime Diwali fair in your browser. Walk under crisscrossing fairy lights, eat garam kesar jalebi & chaat, pop balloons, toss golden rings, ride the giant wheel, light earthen diyas at the Deepotsav Mandap, and watch 1008 Akashdeep lanterns rise into the night sky.
+            <p className="font-display italic text-xl sm:text-2xl text-[#eed9b9] mb-6">
+              Mela chaloge mere sath? <span className="text-[#e87a70]">♥</span>
             </p>
 
-            {/* Primary Entry CTA & Secondary Actions */}
-            <div className="flex flex-wrap items-center justify-center gap-3 mb-7">
+            {/* Primary Enter Button */}
+            <div className="flex flex-wrap items-center gap-3 mb-5">
               <button
                 onClick={() => engineRef.current?.enterMela()}
-                className="px-6 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-base hover:bg-[#ffbe61] transition-colors shadow-lg whitespace-nowrap shrink-0 cursor-pointer"
+                className="flex items-center justify-between gap-8 min-w-[240px] px-6 py-4 rounded-lg bg-[#f1c17d] text-[#1d2625] font-semibold text-xs tracking-widest hover:bg-[#ffd99d] transition-colors shadow-xl cursor-pointer"
               >
-                Chalo, Mela Chalein! →
+                <span>ENTER DIWALI MELA</span>
+                <span>→</span>
               </button>
 
+              <button
+                onClick={() => engineRef.current?.enterMela('partner-meera')}
+                className="px-4 py-4 rounded-lg bg-[#152438]/90 border border-[#f1c17d]/40 text-xs font-semibold text-[#f8e6c7] hover:bg-[#1e324d] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                VISIT DEMO STALL ↗
+              </button>
+            </div>
+
+            <div className="text-[10px] tracking-[0.2em] text-[#d4cfba] mb-4">
+              WALK FREELY · PLAY · GET A LITTLE LOST
+            </div>
+
+            {/* Welcome Community Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2.5 mb-4">
+              <button
+                onClick={handleSnapPostcard}
+                className="px-3.5 py-2.5 rounded-lg bg-[#eac58a] text-[#1b302f] text-xs font-bold hover:bg-[#ffd99d] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                ↗ Doston ko bulao · Invite
+              </button>
               <button
                 onClick={() => setStallModal('create')}
-                className="px-4 py-3 rounded-xl bg-[#1a2540] border border-[#f1aa49]/35 text-[#fff2d2] font-medium text-sm hover:bg-[#243254] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                className="px-3.5 py-2.5 rounded-lg bg-[#142336]/90 border border-[#e3bf79]/45 text-xs font-medium text-[#ffe0a7] hover:bg-[#1d324d] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                Apni Dukaan Lagao (Setup 3D Stall)
+                Promote your shop · Setup 3D Stall
               </button>
-
               <button
                 onClick={() => setStallModal('directory')}
-                className="px-4 py-3 rounded-xl bg-[#1a2540] border border-[#f1aa49]/25 text-[#d8c39e] font-medium text-sm hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                className="px-3.5 py-2.5 rounded-lg bg-[#142336]/90 border border-[#e3bf79]/35 text-xs font-medium text-[#ffe0a7] hover:bg-[#1d324d] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                Explore Partner Stalls ({partners.length})
+                Explore Mela Partners ({partners.length}) ↗
               </button>
             </div>
 
-            {/* Quick Jump Highlights */}
-            <div className="pt-5 border-t border-[#f1aa49]/20">
-              <div className="text-xs text-[#b8a17d] mb-3">
-                OR TELEPORT DIRECTLY TO AN ATTRACTION INSIDE THE 3D MELA
-              </div>
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                {[
-                  { id: 'food-jalebi', label: 'Garam Jalebi & Mithai Gali' },
-                  { id: 'game-balloon', label: 'Nishana Lagao (Balloons)' },
-                  { id: 'game-diya', label: 'Light 7 Mandap Diyas' },
-                  { id: 'ride-wheel', label: 'Chand Wala Giant Wheel' },
-                  { id: 'ride-well', label: 'Maut Ka Kuan (Well of Death)' },
-                  { id: 'finale-akashdeep', label: '1008 Akashdeep Finale' },
-                ].map((spot) => (
-                  <button
-                    key={spot.id}
-                    onClick={() => engineRef.current?.enterMela(spot.id)}
-                    className="px-3 py-1.5 rounded-lg bg-[#162038] border border-[#f1aa49]/25 text-xs font-medium text-[#f2dec0] hover:border-[#f1aa49] hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-                  >
-                    {spot.label}
-                  </button>
-                ))}
-              </div>
+            {/* Quick Teleport Pills */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-2">
+              {[
+                { id: 'food-jalebi', label: 'Garam Jalebi & Chaat' },
+                { id: 'game-balloon', label: 'Balloon Shoot' },
+                { id: 'game-ring', label: 'Golden Ring Toss' },
+                { id: 'game-diya', label: 'Light 7 Diyas' },
+                { id: 'daan-peti', label: '🪔 Charity Daan Peti' },
+                { id: 'ride-wheel', label: 'Chand Wala Jhoola' },
+                { id: 'stage-ramleela', label: 'Ram Leela Stage' },
+                { id: 'ride-well', label: 'Maut Ka Kuan' },
+              ].map((spot) => (
+                <button
+                  key={spot.id}
+                  onClick={() => engineRef.current?.enterMela(spot.id)}
+                  className="px-2.5 py-1 rounded bg-[#121d30]/90 border border-[#f1aa49]/25 text-[11px] text-[#dfcba8] hover:border-[#f1aa49] hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  {spot.label}
+                </button>
+              ))}
             </div>
+
+            <p className="text-[11px] text-[#b5c1bb] mt-3">
+              Sound begins when you enter. Every game and virtual souvenir is free.
+            </p>
+          </div>
+
+          {/* Welcome Footer */}
+          <div className="flex flex-wrap items-center justify-between gap-4 text-[11px] tracking-wider text-[#d8c39e]">
+            <span>A little chaos. A little magic. Our kind of Diwali evening.</span>
+            <button
+              onClick={() => setSupportOpen(true)}
+              className="pointer-events-auto text-[#f1c17d] hover:underline cursor-pointer"
+            >
+              🪔 Daan Patra & Community Blessings ({communityDiyas} Diyas Lit) ↗
+            </button>
           </div>
         </main>
       )}
 
-      {/* PROXIMITY INTERACTION PROMPT (When walking near a stall, game, or ride) */}
-      {mode === 'walk' && nearSpec && !talkSpec && (
-        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
-          <button
-            onClick={() => openConversation(nearSpec)}
-            className="flex items-center gap-3 px-5 py-3 rounded-xl bg-[#121a2d]/95 border-2 border-[#f1aa49] text-[#fff5de] shadow-2xl hover:bg-[#19243d] transition-transform active:scale-95 cursor-pointer"
-          >
-            <span className="px-2 py-0.5 rounded bg-[#f1aa49] text-[#121726] font-mono-num text-xs font-bold">
-              E
-            </span>
-            <div className="text-left">
-              <div className="text-[11px] font-semibold tracking-wider text-[#f1aa49]">
-                {nearSpec.type === 'wheel' || nearSpec.type === 'carousel' || nearSpec.type === 'pirate-ship'
-                  ? 'RIDE ATTRACTION'
-                  : nearSpec.type === 'balloon' || nearSpec.type === 'ring' || nearSpec.type === 'diya-game'
-                  ? 'PLAY FREE MELA GAME'
-                  : nearSpec.type === 'finale' || nearSpec.type === 'fireworks'
-                  ? 'CELEBRATE DIWALI'
-                  : 'TALK TO SHOPKEEPER'}
-              </div>
-              <div className="text-sm font-display font-semibold whitespace-nowrap">
-                {nearSpec.name}
-              </div>
-            </div>
-            <span className="text-xs text-[#f1aa49] font-semibold ml-1">Open →</span>
-          </button>
-        </div>
-      )}
-
-      {/* INTERACTIVE MINI-MAP PANEL (Top-Left below header) */}
+      {/* IN-MELA LOCATION INDICATOR & MINI-MAP (Top-Left below header) */}
       {(mode === 'walk' || mode === 'entering') && (
-        <div className="fixed top-16 left-4 z-20 pointer-events-auto">
-          <div className="rounded-xl bg-[#10182b]/95 border border-[#f1aa49]/35 overflow-hidden shadow-xl">
+        <div className="fixed top-16 left-4 z-20 flex flex-col gap-2 pointer-events-auto">
+          {/* Current Zone Indicator */}
+          <div className="px-3.5 py-1.5 rounded-lg bg-[#10182b]/95 border border-[#f1aa49]/30 text-xs font-medium text-[#f5e4c3] shadow-lg">
+            Location: <strong className="text-[#f1aa49]">{currentZoneLabel}</strong>
+          </div>
+
+          {/* Collapsible Interactive Mini-Map */}
+          <div className="rounded-xl bg-[#10182b]/95 border border-[#f1aa49]/35 overflow-hidden shadow-xl w-56">
             <button
               onClick={() => setMapOpen((prev) => !prev)}
               className="flex items-center justify-between gap-4 w-full px-3.5 py-2 text-xs font-semibold text-[#f7e7c4] hover:bg-white/5 transition-colors cursor-pointer"
@@ -422,25 +509,25 @@ export default function App() {
             >
               <span className="flex items-center gap-1.5">
                 <Compass className="w-3.5 h-3.5 text-[#f1aa49]" />
-                Diwali Mela Map
+                MELA MAP
               </span>
-              <span className="text-[#f1aa49]">{mapOpen ? 'Hide ▴' : 'Expand ▾'}</span>
+              <span className="text-[#f1aa49] font-mono-num">{mapOpen ? '−' : '+'}</span>
             </button>
 
             {mapOpen && (
-              <div className="p-3 pt-1 border-t border-[#f1aa49]/20 w-56">
+              <div className="p-3 pt-1 border-t border-[#f1aa49]/20">
                 <svg
                   viewBox="0 0 100 120"
                   role="img"
-                  aria-label="Interactive Diwali Mela map—click any dot to teleport"
+                  aria-label="Mela map showing your current location—click any dot to teleport"
                   className="w-full h-48 rounded-lg bg-[#0a101d] border border-[#f1aa49]/20"
                 >
                   {/* Main Bazaar Roads */}
                   <path
                     d="M50 112 L50 14 M14 34 L86 34 M14 66 L86 66 M18 86 L82 86"
-                    stroke="#8c6d3f"
-                    strokeWidth="2.2"
-                    opacity="0.45"
+                    stroke="#967948"
+                    strokeWidth="4"
+                    opacity="0.55"
                     fill="none"
                   />
 
@@ -448,23 +535,29 @@ export default function App() {
                     1008 AKASHDEEP
                   </text>
                   <text x="50" y="117" textAnchor="middle" fill="#d8c39e" fontSize="4.5">
-                    ENTRANCE TORAN
+                    ENTRANCE
                   </text>
 
-                  {/* Interactable Stalls & Rides Dots (Click to Teleport!) */}
+                  {/* Interactable Stalls & Rides Dots */}
                   {allInteractables.map((item) => {
                     const cx = 50 + item.x * 1.1;
                     const cy = 68 + item.z * 0.82;
                     const dotColor =
                       item.type === 'finale'
-                        ? '#ff9b35'
-                        : item.type === 'wheel' || item.type === 'carousel' || item.type === 'pirate-ship' || item.type === 'well'
+                        ? '#e87552'
+                        : item.type === 'partner'
+                        ? '#ffce70'
+                        : item.type === 'wheel' ||
+                          item.type === 'carousel' ||
+                          item.type === 'pirate-ship' ||
+                          item.type === 'well' ||
+                          item.type === 'stage'
                         ? '#4cc9f0'
                         : item.type === 'balloon' || item.type === 'ring' || item.type === 'diya-game'
                         ? '#ff4d6d'
-                        : item.type === 'partner'
-                        ? '#ffd27d'
-                        : '#8ac926';
+                        : item.type === 'daan-peti'
+                        ? '#ffd700'
+                        : '#b3c2a6';
                     return (
                       <g
                         key={item.id}
@@ -475,7 +568,7 @@ export default function App() {
                         <circle
                           cx={cx}
                           cy={cy}
-                          r={item.type === 'finale' || item.type === 'wheel' ? 3.2 : 2.3}
+                          r={item.type === 'finale' || item.type === 'partner' ? 3.4 : 2.4}
                           fill={dotColor}
                           stroke="#0e1525"
                           strokeWidth="0.6"
@@ -486,8 +579,8 @@ export default function App() {
 
                   {/* Player Position & Direction Arrow */}
                   <path
-                    d="M0 -4.2 L3.2 3.4 L0 1.8 L-3.2 3.4 Z"
-                    fill="#ffffff"
+                    d="M0 -4.5 L3.4 3.6 L0 1.9 L-3.4 3.6 Z"
+                    fill="#fff2cd"
                     stroke="#f1aa49"
                     strokeWidth="0.8"
                     transform={`translate(${50 + playerMapPos.x * 1.1} ${68 + playerMapPos.z * 0.82}) rotate(${
@@ -496,15 +589,120 @@ export default function App() {
                   />
                 </svg>
                 <div className="text-[11px] text-[#b8a17d] mt-2 text-center">
-                  Tap any glowing dot on the map to teleport instantly.
+                  Follow the lights or click any dot to teleport.
                 </div>
               </div>
             )}
           </div>
+
+          {/* DIWALI BHAJANS & RADIO PLAYER WIDGET */}
+          {radioOpen && (
+            <div className="p-3.5 rounded-xl bg-[#10182b]/95 border border-[#f1aa49]/40 shadow-xl w-64">
+              <div className="flex items-center justify-between text-[10px] font-semibold tracking-wider text-[#f1aa49] mb-2">
+                <span>♫ DIWALI MELA RADIO</span>
+                <button
+                  onClick={() => setRadioOpen(false)}
+                  className="text-[#d8c39e] hover:text-white cursor-pointer"
+                >
+                  ×
+                </button>
+              </div>
+
+              <select
+                value={radioTrackIdx}
+                onChange={(e) => handleChangeRadioTrack(Number(e.target.value))}
+                aria-label="Select Diwali Mela music track"
+                className="w-full px-2.5 py-1.5 rounded-lg bg-[#0b101d] border border-[#f1aa49]/30 text-xs font-medium text-[#ffe0a6] mb-2.5 focus:outline-none focus:border-[#f1aa49]"
+              >
+                {DIWALI_RADIO_TRACKS.map((t, idx) => (
+                  <option key={t.id} value={idx}>
+                    {t.title}
+                  </option>
+                ))}
+              </select>
+
+              <div className="text-[11px] text-[#b8a17d] mb-2.5">
+                {DIWALI_RADIO_TRACKS[radioTrackIdx].subtitle}
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  onClick={handleToggleRadioPlay}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#f1aa49] text-[#121726] text-xs font-semibold hover:bg-[#ffbe61] cursor-pointer"
+                >
+                  {radioPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                  {radioPlaying ? 'Pause' : 'Play'}
+                </button>
+
+                <div className="flex items-center gap-2 flex-1">
+                  <Volume2 className="w-3.5 h-3.5 text-[#f1aa49] shrink-0" />
+                  <input
+                    type="range"
+                    min="0.05"
+                    max="1"
+                    step="0.05"
+                    value={radioVolume}
+                    onChange={(e) => handleVolumeChange(Number(e.target.value))}
+                    aria-label="Music volume"
+                    className="w-full accent-[#f1aa49] cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* VIRTUAL TOUCH JOYSTICK (Bottom-Left during walk mode on touch/narrow viewports or anytime) */}
+      {/* CENTER CROSSHAIR & WALK TIP (During walk mode) */}
+      {mode === 'walk' && !talkSpec && (
+        <>
+          <div
+            aria-hidden="true"
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[#ffe8b8]/60 pointer-events-none z-10"
+          />
+          {!nearSpec && (
+            <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-10 px-3.5 py-1 rounded-full bg-[#0e1525]/80 border border-[#f1aa49]/20 text-[10px] tracking-widest text-[#d8c39e] whitespace-nowrap pointer-events-none hidden sm:block">
+              WASD / ARROWS TO WALK · DRAG TO LOOK · E TO TALK
+            </div>
+          )}
+        </>
+      )}
+
+      {/* PROXIMITY INTERACTION PROMPT (When walking near a stall, game, stage, or ride) */}
+      {mode === 'walk' && nearSpec && !talkSpec && (
+        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+          <button
+            onClick={() => openConversation(nearSpec)}
+            className="flex items-center gap-3 px-5 py-3 rounded-xl bg-[#121a2d]/95 border-2 border-[#f1aa49] text-[#fff5de] shadow-2xl hover:bg-[#19243d] transition-transform active:scale-95 cursor-pointer"
+          >
+            <kbd className="px-2 py-0.5 rounded bg-[#f1aa49] text-[#121726] font-mono-num text-xs font-bold">
+              E
+            </kbd>
+            <div className="text-left">
+              <div className="text-[10px] font-semibold tracking-wider text-[#f1aa49]">
+                {nearSpec.type === 'daan-peti'
+                  ? 'CLICK BOX OR PRESS E · SCAN CHARITY QR'
+                  : nearSpec.type === 'stage'
+                  ? 'WATCH RAM LEELA & DEEPOTSAV'
+                  : nearSpec.type === 'wheel' ||
+                    nearSpec.type === 'carousel' ||
+                    nearSpec.type === 'pirate-ship' ||
+                    nearSpec.type === 'well'
+                  ? 'RIDE'
+                  : nearSpec.type === 'finale' || nearSpec.type === 'fireworks'
+                  ? 'CELEBRATE'
+                  : 'TALK'}
+              </div>
+              <div className="text-sm font-display font-semibold whitespace-nowrap">
+                {nearSpec.name}
+              </div>
+            </div>
+            <span className="text-xs text-[#f1aa49] font-semibold ml-1">↗</span>
+          </button>
+        </div>
+      )}
+
+      {/* VIRTUAL TOUCH JOYSTICK (Bottom-Left during walk mode on mobile/touch) */}
       {mode === 'walk' && (
         <div className="fixed bottom-24 left-5 z-20 flex items-center gap-3 pointer-events-auto md:hidden">
           <div
@@ -513,6 +711,7 @@ export default function App() {
             onPointerUp={handleJoyEnd}
             onPointerCancel={handleJoyEnd}
             aria-label="Movement joystick"
+            role="group"
             className="w-24 h-24 rounded-full bg-[#10182b]/90 border-2 border-[#f1aa49]/45 flex items-center justify-center touch-none"
           >
             <div
@@ -532,9 +731,9 @@ export default function App() {
             <div className="flex items-center justify-between text-xs font-semibold text-[#f1aa49] mb-1">
               <span>
                 {gameHud.mode === 'balloon'
-                  ? 'NISHANA LAGAO · BALLOON SHOOT'
+                  ? 'NISHANA LAGAO · FREE TO PLAY'
                   : gameHud.mode === 'ring'
-                  ? 'SWARNA CHALLA · GOLDEN RING TOSS'
+                  ? 'RING TOSS · FREE TO PLAY'
                   : gameHud.mode === 'diya-game'
                   ? 'DEEPOTSAV MANDAP · LIGHT 7 DIYAS'
                   : 'MAUT KA KUAN · WELL OF DEATH'}
@@ -544,7 +743,7 @@ export default function App() {
                   ? `${gameHud.shotsLeft}s left · Rings: ${gameHud.score}/8`
                   : gameHud.mode === 'diya-game'
                   ? `Diyas Lit: ${gameHud.score}/7`
-                  : `Left: ${gameHud.shotsLeft} · Score: ${gameHud.score}`}
+                  : `${gameHud.shotsLeft} ${gameHud.mode === 'balloon' ? 'shots' : 'rings'} left · Score: ${gameHud.score}`}
               </span>
             </div>
 
@@ -604,12 +803,14 @@ export default function App() {
         </div>
       )}
 
-      {/* ACTIVE RIDE / FIREWORKS SHOW PROGRESS BAR */}
-      {(mode === 'ride' || mode === 'firework-show') && rideProgress && (
+      {/* ACTIVE RIDE / STAGE / FIREWORKS SHOW PROGRESS BAR */}
+      {(mode === 'ride' || mode === 'firework-show' || mode === 'stage') && rideProgress && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-20 w-[90vw] max-w-md pointer-events-auto">
           <div className="rounded-2xl bg-[#10182b]/95 border border-[#f1aa49]/45 p-4 shadow-2xl text-center">
             <div className="text-xs font-semibold tracking-wider text-[#f1aa49] mb-1">
-              ENJOY THE VIEW · DRAG TO LOOK AROUND
+              {mode === 'stage'
+                ? 'AYODHYA DEEPOTSAV & RAM LEELA STAGE'
+                : 'ENJOY THE VIEW · DRAG TO LOOK AROUND'}
             </div>
             <div className="text-base font-display font-semibold text-[#fff5de] mb-2">
               {rideProgress.name}
@@ -624,7 +825,7 @@ export default function App() {
               onClick={() => engineRef.current?.leaveActivity()}
               className="px-4 py-1.5 rounded-lg bg-[#1d2842] border border-[#f1aa49]/30 text-xs font-medium text-[#fff5de] hover:bg-[#273659] transition-colors cursor-pointer"
             >
-              Step Off Safely ×
+              Back to Mela ×
             </button>
           </div>
         </div>
@@ -706,29 +907,27 @@ export default function App() {
                     <button
                       onClick={() => {
                         setBargainStage(1);
-                        const msg = 'Bhaiya ₹50 ka hai! Asli Diwali special hand-crafted item hai!';
+                        const msg = 'Bhaiya ₹50 ka hai! Ekdum chamakta Diwali special item hai!';
                         setTalkReply(msg);
-                        engineRef.current?.audio.speak(msg);
+                        engineRef.current?.audio.speak('Bhaiya pachaas ka hai!');
                       }}
                       className="px-3.5 py-2 rounded-xl bg-[#1b2640] border border-[#f1aa49]/30 text-xs font-semibold text-[#f1aa49] hover:bg-[#253457] cursor-pointer"
                     >
                       Ye kitne ka hai?
                     </button>
 
-                    {bargainStage >= 1 && (
-                      <button
-                        onClick={() => {
-                          setBargainStage(2);
-                          const msg =
-                            'Arre bhai, tum bhi na! Achha chalo Diwali hai—tumhare liye bilkul FREE! Khushi se le jao!';
-                          setTalkReply(msg);
-                          engineRef.current?.audio.speak(msg);
-                        }}
-                        className="px-3.5 py-2 rounded-xl bg-[#1b2640] border border-[#f1aa49]/30 text-xs font-semibold text-[#ff9ebb] hover:bg-[#253457] cursor-pointer"
-                      >
-                        Bhaiya thoda kam karo na (Bargain)
-                      </button>
-                    )}
+                    <button
+                      onClick={() => {
+                        setBargainStage(2);
+                        const msg =
+                          'Arre bhai, tum bhi na! Achha chalo, tumhare liye ₹20 😄 (All virtual souvenirs are free!)';
+                        setTalkReply(msg);
+                        engineRef.current?.audio.speak('Achha chalo, tumhare liye bees!');
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-[#1b2640] border border-[#f1aa49]/30 text-xs font-semibold text-[#ff9ebb] hover:bg-[#253457] cursor-pointer"
+                    >
+                      Bargain 😭
+                    </button>
                   </div>
 
                   {talkSpec.choices?.map((c) => (
@@ -771,7 +970,7 @@ export default function App() {
                         rel="noopener noreferrer"
                         className="px-4 py-2.5 rounded-xl bg-[#f1aa49] text-[#121726] text-xs font-semibold hover:bg-[#ffbe61] transition-colors"
                       >
-                        Visit Brand Website ↗
+                        Visit Brand Shop ↗
                       </a>
                     )}
                     <button
@@ -781,7 +980,16 @@ export default function App() {
                       }}
                       className="px-4 py-2.5 rounded-xl bg-[#1b2640] border border-[#f1aa49]/30 text-xs font-medium text-[#f7e7c4] hover:text-white cursor-pointer"
                     >
-                      Place My Own Stall in This Mela →
+                      Create My Stall →
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTalkSpec(null);
+                        setStallModal('directory');
+                      }}
+                      className="px-4 py-2.5 rounded-xl bg-[#1b2640] border border-[#f1aa49]/30 text-xs font-medium text-[#f7e7c4] hover:text-white cursor-pointer"
+                    >
+                      Explore All Partners →
                     </button>
                   </div>
                 </>
@@ -797,7 +1005,7 @@ export default function App() {
                   }}
                   className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
                 >
-                  3 Shots · Play Balloon Shoot (Free) →
+                  3 shot ₹20 ke? PLAY FREE →
                 </button>
               )}
 
@@ -810,7 +1018,7 @@ export default function App() {
                   }}
                   className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
                 >
-                  5 Golden Rings · Play Ring Toss (Free) →
+                  5 ring ₹20 ke? PLAY FREE →
                 </button>
               )}
 
@@ -823,7 +1031,7 @@ export default function App() {
                   }}
                   className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
                 >
-                  Light All 7 Deepotsav Mandap Diyas →
+                  Light All 7 Deepotsav Mandap Diyas · FREE →
                 </button>
               )}
 
@@ -839,7 +1047,21 @@ export default function App() {
                   }}
                   className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
                 >
-                  Jhoola Chalega? Board Ride Now (Free) →
+                  Jhoola chalega? RIDE FREE →
+                </button>
+              )}
+
+              {/* Stage Show */}
+              {talkSpec.type === 'stage' && (
+                <button
+                  onClick={() => {
+                    const s = talkSpec;
+                    setTalkSpec(null);
+                    engineRef.current?.startStageShow(s);
+                  }}
+                  className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
+                >
+                  Baith ke Ram Leela & Deepotsav dekhein →
                 </button>
               )}
 
@@ -854,7 +1076,7 @@ export default function App() {
                     }}
                     className="px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
                   >
-                    Ride the Vertical Wall Yourself! →
+                    Ride the Wall Yourself (Play Game) →
                   </button>
                   <button
                     onClick={() => {
@@ -864,7 +1086,7 @@ export default function App() {
                     }}
                     className="px-4 py-3 rounded-xl bg-[#1b2640] border border-[#f1aa49]/40 text-[#fff5de] font-medium text-sm hover:bg-[#253457] transition-colors cursor-pointer"
                   >
-                    Watch Stunt Show from Gallery
+                    Watch the Show from Gallery →
                   </button>
                 </div>
               )}
@@ -878,7 +1100,7 @@ export default function App() {
                   }}
                   className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
                 >
-                  Ek Photo Ho Jaaye! Create Diwali Postcard →
+                  Ek photo ho jaaye →
                 </button>
               )}
 
@@ -892,7 +1114,7 @@ export default function App() {
                   }}
                   className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
                 >
-                  Light Up the Night Sky (Fireworks Show) ✦
+                  Light up the virtual sky ✦
                 </button>
               )}
 
@@ -905,7 +1127,7 @@ export default function App() {
                   }}
                   className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-semibold text-sm hover:bg-[#ffbe61] transition-colors cursor-pointer"
                 >
-                  Begin 1008 Akashdeep & Grand Finale →
+                  Begin 1008 Akashdeep Finale →
                 </button>
               )}
 
@@ -916,8 +1138,30 @@ export default function App() {
                 Bas dekh raha hoon. Phir milte hain!
               </button>
             </div>
+
+            <div className="mt-4 pt-3 border-t border-[#f1aa49]/15 flex items-center justify-between text-[11px] text-[#9ba79f]">
+              <span>Virtual mela items only. All play is free.</span>
+              <button
+                onClick={() => {
+                  setTalkSpec(null);
+                  setSupportOpen(true);
+                }}
+                className="text-[#f1c17d] hover:underline cursor-pointer"
+              >
+                Optional daan patra ↗
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* SEVA DAAN PETI · CHARITY QR CODE MODAL */}
+      {supportOpen && (
+        <DaanPetiModal
+          onClose={() => setSupportOpen(false)}
+          onConfirmDonation={handleDonateComplete}
+          onToast={showToast}
+        />
       )}
 
       {/* MELA JHOLA (SOUVENIR BAG) MODAL */}
@@ -926,7 +1170,7 @@ export default function App() {
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#090d18]/85 pointer-events-auto"
           role="dialog"
           aria-modal="true"
-          aria-label="Your Diwali Mela Jhola"
+          aria-label="Your Diwali Mela Bag"
         >
           <div className="relative w-full max-w-lg rounded-2xl bg-[#131b2e] border border-[#f1aa49]/40 p-6 text-[#f7e7c4] shadow-2xl">
             <button
@@ -938,13 +1182,13 @@ export default function App() {
             </button>
 
             <div className="text-xs font-semibold tracking-wider text-[#f1aa49] mb-1">
-              CHHOTI CHHOTI KHUSHIYAAN · DIGITAL SOUVENIRS
+              CHHOTI CHHOTI KHUSHIYAAN
             </div>
             <h2 className="text-2xl font-display font-bold text-[#fff5de] mb-2">
-              Your Diwali Mela Jhola
+              Your mela bag.
             </h2>
             <p className="text-xs text-[#d8c39e] mb-4">
-              Every mithai tasted, balloon popped, and souvenir collected during your evening walk.
+              Digital memories from your Diwali evening. Talk to a toy seller, taste garam jalebi & chaat, or win a game prize.
             </p>
 
             {/* Tabular Metrics Strip */}
@@ -953,19 +1197,19 @@ export default function App() {
                 <div className="text-xl font-mono-num font-bold text-[#f1aa49]">
                   {stats.balloonsPopped}
                 </div>
-                <div className="text-[11px] text-[#d8c39e]">Balloons Popped</div>
+                <div className="text-[11px] text-[#d8c39e]">Balloons popped</div>
               </div>
               <div className="p-3 rounded-xl bg-[#0d1322] border border-[#f1aa49]/25 text-center">
                 <div className="text-xl font-mono-num font-bold text-[#f1aa49]">
                   {stats.ringsLanded}
                 </div>
-                <div className="text-[11px] text-[#d8c39e]">Rings Landed</div>
+                <div className="text-[11px] text-[#d8c39e]">Rings landed</div>
               </div>
               <div className="p-3 rounded-xl bg-[#0d1322] border border-[#f1aa49]/25 text-center">
                 <div className="text-xl font-mono-num font-bold text-[#f1aa49]">
                   {stats.diyasLit}/7
                 </div>
-                <div className="text-[11px] text-[#d8c39e]">Mandap Diyas Lit</div>
+                <div className="text-[11px] text-[#d8c39e]">Mandap diyas lit</div>
               </div>
             </div>
 
@@ -976,7 +1220,7 @@ export default function App() {
                   className="px-3.5 py-2 rounded-lg bg-[#0d1322] border border-[#f1aa49]/20 text-xs font-medium text-[#fff5de] flex items-center justify-between"
                 >
                   <span>✦ {item}</span>
-                  <span className="text-[#b8a17d]">Collected</span>
+                  <span className="text-[10px] tracking-wider text-[#b8a17d]">VIRTUAL SOUVENIR</span>
                 </div>
               ))}
             </div>
@@ -990,14 +1234,14 @@ export default function App() {
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#f1aa49] text-[#121726] text-xs font-semibold hover:bg-[#ffbe61] transition-colors cursor-pointer"
               >
                 <Share2 className="w-4 h-4" />
-                Create Shareable Mela Postcard →
+                Share Mela Card →
               </button>
 
               <button
                 onClick={() => setBagOpen(false)}
                 className="px-4 py-2.5 rounded-xl bg-[#1d2842] text-xs font-medium text-[#f7e7c4] hover:bg-[#273659] transition-colors cursor-pointer"
               >
-                Chalo, Aur Ghoomein →
+                Chalo, aur ghoomein →
               </button>
             </div>
           </div>
@@ -1022,51 +1266,71 @@ export default function App() {
             </button>
 
             <div className="text-xs font-semibold tracking-wider text-[#f1aa49] mb-1">
-              THIS DIWALI MELA IS YOURS TO EXPLORE
+              THIS MELA IS YOURS TO EXPLORE
             </div>
             <h2 className="text-2xl font-display font-bold text-[#fff5de] mb-4">
-              How to Walk, Play & Celebrate
+              Thoda ghoom lo.
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs mb-5">
               <div className="p-3 rounded-xl bg-[#0d1322] border border-[#f1aa49]/20">
-                <div className="font-semibold text-[#f1aa49] mb-1">Walk Around</div>
-                <div className="text-[#d8c39e]">Use W, A, S, D or Arrow Keys (or touch joystick on mobile). Hold Shift to run.</div>
+                <div className="font-semibold text-[#f1aa49] mb-1">W A S D / Arrows</div>
+                <div className="text-[#d8c39e]">Walk through the glowing Diwali bazaar lanes.</div>
               </div>
               <div className="p-3 rounded-xl bg-[#0d1322] border border-[#f1aa49]/20">
-                <div className="font-semibold text-[#f1aa49] mb-1">Look Around</div>
-                <div className="text-[#d8c39e]">Click and drag anywhere on the 3D scene to turn your head and admire the lights.</div>
+                <div className="font-semibold text-[#f1aa49] mb-1">Drag the Scene</div>
+                <div className="text-[#d8c39e]">Look around you at the lanterns, rides, and sky.</div>
               </div>
               <div className="p-3 rounded-xl bg-[#0d1322] border border-[#f1aa49]/20">
-                <div className="font-semibold text-[#f1aa49] mb-1">Talk & Play Games</div>
-                <div className="text-[#d8c39e]">Walk near any stall or ride and press E (or click the prompt button) to interact.</div>
+                <div className="font-semibold text-[#f1aa49] mb-1">E / Talk & Play</div>
+                <div className="text-[#d8c39e]">Talk when near a vendor, game stall, or ride.</div>
               </div>
               <div className="p-3 rounded-xl bg-[#0d1322] border border-[#f1aa49]/20">
-                <div className="font-semibold text-[#f1aa49] mb-1">Zen / Cinema Mode</div>
-                <div className="text-[#d8c39e]">Press H or click Hide Controls on the bottom dock for an unobstructed view.</div>
+                <div className="font-semibold text-[#f1aa49] mb-1">Shift / Run</div>
+                <div className="text-[#d8c39e]">Move a little faster across the fairgrounds.</div>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="space-y-2 mb-4">
               <button
                 onClick={() => {
                   setHelpOpen(false);
                   engineRef.current?.startFireworkShow();
                 }}
-                className="px-3.5 py-2 rounded-lg bg-[#1d2842] border border-[#f1aa49]/35 text-xs font-medium text-[#fff5de] hover:bg-[#273659] cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-[#f1aa49] text-[#121726] text-xs font-semibold hover:bg-[#ffbe61] cursor-pointer"
               >
-                Launch Sky Fireworks Show ✦
+                Roshni ka Jashn · Watch Fireworks Show ✦
               </button>
-              <button
-                onClick={() => {
-                  setHelpOpen(false);
-                  engineRef.current?.startGrandFinale();
-                }}
-                className="px-3.5 py-2 rounded-lg bg-[#f1aa49] text-[#121726] text-xs font-semibold hover:bg-[#ffbe61] cursor-pointer"
-              >
-                Start 1008 Akashdeep Finale →
-              </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    setHelpOpen(false);
+                    const wellSpec = engineRef.current?.interactables.find((s) => s.type === 'well');
+                    if (wellSpec) engineRef.current?.startWellOfDeath(true, wellSpec);
+                  }}
+                  className="py-2.5 rounded-xl bg-[#1d2842] border border-[#f1aa49]/35 text-xs font-medium text-[#fff5de] hover:bg-[#273659] cursor-pointer"
+                >
+                  Maut ka Kuan · Watch Show →
+                </button>
+                <button
+                  onClick={() => {
+                    setHelpOpen(false);
+                    const wellSpec = engineRef.current?.interactables.find((s) => s.type === 'well');
+                    if (wellSpec) engineRef.current?.startWellOfDeath(false, wellSpec);
+                  }}
+                  className="py-2.5 rounded-xl bg-[#1d2842] border border-[#f1aa49]/35 text-xs font-medium text-[#fff5de] hover:bg-[#273659] cursor-pointer"
+                >
+                  Maut ka Kuan · Ride the Wall →
+                </button>
+              </div>
             </div>
+
+            <button
+              onClick={() => setHelpOpen(false)}
+              className="w-full py-2.5 rounded-xl bg-[#0d1322] border border-[#f1aa49]/25 text-xs font-semibold text-[#f1aa49] hover:bg-[#162038] cursor-pointer"
+            >
+              Samajh gaye. Chalo! →
+            </button>
           </div>
         </div>
       )}
@@ -1128,39 +1392,75 @@ export default function App() {
 
           {!dockCollapsed && (
             <div className="flex flex-wrap items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-[#10182b]/95 border border-[#f1aa49]/40 shadow-2xl">
+              {/* Invite & Promote Stall Highlight Buttons (Like community-dock in mela-chaloge) */}
+              <button
+                onClick={handleSnapPostcard}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#f2cf94] text-[#1b302d] text-xs font-bold hover:bg-[#ffe2b0] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                Invite · Postcard
+              </button>
+
+              <button
+                onClick={() => setStallModal('create')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#192f32] border border-[#e7c389]/45 text-xs font-semibold text-[#f1d3a2] hover:bg-[#223f43] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <Store className="w-3.5 h-3.5 text-[#f1aa49]" />
+                Apni Dukaan Lagao
+              </button>
+
+              <div className="h-4 w-[1px] bg-[#f1aa49]/25 mx-0.5 hidden sm:block" />
+
               {/* Quick Teleport Pills */}
               <button
                 onClick={() => engineRef.current?.teleportTo('food-mithai')}
-                className="px-3 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                className="px-2.5 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
                 Mithai & Chaat
               </button>
               <button
                 onClick={() => engineRef.current?.teleportTo('game-balloon')}
-                className="px-3 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                className="px-2.5 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                Balloon & Ring Games
+                Games
               </button>
               <button
                 onClick={() => engineRef.current?.teleportTo('game-diya')}
-                className="px-3 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                className="px-2.5 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                Deepotsav Mandap
+                7 Diyas Mandap
+              </button>
+              <button
+                onClick={() => {
+                  engineRef.current?.teleportTo('daan-peti');
+                  setSupportOpen(true);
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#2a1f14] border border-[#f1aa49]/45 hover:bg-[#3b2b1b] text-xs font-semibold text-[#ffd27d] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                title="Walk to Seva Daan Peti near 7 Diyas Mandap & Scan QR Code"
+              >
+                <Heart className="w-3.5 h-3.5 text-[#f1aa49]" />
+                Daan Peti QR
               </button>
               <button
                 onClick={() => engineRef.current?.teleportTo('ride-wheel')}
-                className="px-3 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                className="px-2.5 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
                 Giant Wheel
               </button>
               <button
+                onClick={() => engineRef.current?.teleportTo('stage-ramleela')}
+                className="px-2.5 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                Ram Leela
+              </button>
+              <button
                 onClick={() => engineRef.current?.teleportTo('ride-well')}
-                className="px-3 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                className="px-2.5 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
                 Maut Ka Kuan
               </button>
 
-              <div className="h-4 w-[1px] bg-[#f1aa49]/25 mx-1 hidden sm:block" />
+              <div className="h-4 w-[1px] bg-[#f1aa49]/25 mx-0.5 hidden sm:block" />
 
               {/* Handheld Sparkler Toggle */}
               <button
@@ -1173,49 +1473,44 @@ export default function App() {
                 }`}
               >
                 <Flame className="w-3.5 h-3.5" />
-                Phuljhari {stats.sparklerActive ? 'Lit' : 'Off'}
+                Phuljhari
               </button>
 
               {/* Walk / Run Toggle */}
               <button
                 onClick={handleToggleRun}
                 aria-pressed={isRunning}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                   isRunning
                     ? 'bg-[#f1aa49]/25 border border-[#f1aa49] text-[#fff5de]'
                     : 'bg-[#1a2540] text-[#d8c39e] hover:text-white'
                 }`}
               >
-                {isRunning ? 'Running 🏃' : 'Walk / Run'}
-              </button>
-
-              {/* Postcard Snapshot */}
-              <button
-                onClick={handleSnapPostcard}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-                title="Capture Diwali Postcard"
-              >
-                <Camera className="w-3.5 h-3.5 text-[#f1aa49]" />
-                Postcard
+                {isRunning ? 'WALK' : 'RUN'}
               </button>
 
               {/* Mela Jhola Bag */}
               <button
                 onClick={() => setBagOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-                title="Open Mela Jhola Bag"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                title="Open Mela Bag"
               >
                 <ShoppingBag className="w-3.5 h-3.5 text-[#f1aa49]" />
-                Jhola ({stats.items.length})
+                Bag ({stats.items.length})
               </button>
 
-              {/* Setup Your Stall */}
+              {/* Diwali Radio Toggle */}
               <button
-                onClick={() => setStallModal('create')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1a2540] hover:bg-[#243254] text-xs font-medium text-[#fff3d6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                onClick={() => setRadioOpen((prev) => !prev)}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  radioOpen
+                    ? 'bg-[#f1aa49] text-[#121726]'
+                    : 'bg-[#1a2540] hover:bg-[#243254] text-[#f1aa49]'
+                }`}
+                aria-label="Toggle Diwali Radio"
+                title="Diwali Bhajans & Radio"
               >
-                <Store className="w-3.5 h-3.5 text-[#f1aa49]" />
-                Add Stall
+                <Music className="w-4 h-4" />
               </button>
 
               {/* Audio Mute/Unmute */}

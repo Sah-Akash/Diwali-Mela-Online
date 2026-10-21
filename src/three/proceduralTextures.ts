@@ -164,7 +164,15 @@ export function createCanopyStripeTexture(
 
   // Bottom golden zari trim
   ctx.fillStyle = '#f2b749';
-  ctx.fillRect(0, 232, 256, 24);
+  ctx.fillRect(0, 226, 256, 30);
+
+  // Scalloped gold dots along trim
+  ctx.fillStyle = '#fff5d6';
+  for (let i = 0; i < 16; i++) {
+    ctx.beginPath();
+    ctx.arc(i * 16 + 8, 241, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -172,6 +180,106 @@ export function createCanopyStripeTexture(
   texture.wrapT = THREE.ClampToEdgeWrapping;
   texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   return texture;
+}
+
+export function createCobbleStoneTexture(renderer: THREE.WebGLRenderer): {
+  map: THREE.CanvasTexture;
+  bumpMap: THREE.CanvasTexture;
+} {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d')!;
+
+  const bumpCanvas = document.createElement('canvas');
+  bumpCanvas.width = 512;
+  bumpCanvas.height = 512;
+  const bCtx = bumpCanvas.getContext('2d')!;
+
+  ctx.fillStyle = '#38251a';
+  ctx.fillRect(0, 0, 512, 512);
+  bCtx.fillStyle = '#222222';
+  bCtx.fillRect(0, 0, 512, 512);
+
+  const rows = 8;
+  const cols = 4;
+  const cellH = 512 / rows;
+  const cellW = 512 / cols;
+
+  const tones = ['#5a3b29', '#4e3222', '#63412d', '#523626', '#694530'];
+  for (let r = 0; r < rows; r++) {
+    const offset = (r % 2) * (cellW / 2);
+    for (let c = -1; c <= cols; c++) {
+      const x = c * cellW + offset;
+      const y = r * cellH;
+      ctx.fillStyle = tones[(r * 3 + c + 10) % tones.length];
+      ctx.beginPath();
+      ctx.roundRect(x + 4, y + 4, cellW - 8, cellH - 8, 8);
+      ctx.fill();
+
+      // Subtle golden lantern sheen on cobble top
+      bCtx.fillStyle = '#dddddd';
+      bCtx.beginPath();
+      bCtx.roundRect(x + 6, y + 6, cellW - 12, cellH - 12, 6);
+      bCtx.fill();
+    }
+  }
+
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = THREE.RepeatWrapping;
+  map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(3, 22);
+  map.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+  const bumpMap = new THREE.CanvasTexture(bumpCanvas);
+  bumpMap.wrapS = THREE.RepeatWrapping;
+  bumpMap.wrapT = THREE.RepeatWrapping;
+  bumpMap.repeat.set(3, 22);
+
+  return { map, bumpMap };
+}
+
+export function createChakriSpiralTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+
+  ctx.clearRect(0, 0, 256, 256);
+  const cx = 128;
+  const cy = 128;
+
+  const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, 124);
+  grad.addColorStop(0, 'rgba(255, 255, 240, 1)');
+  grad.addColorStop(0.35, 'rgba(255, 210, 80, 0.9)');
+  grad.addColorStop(0.7, 'rgba(255, 90, 140, 0.55)');
+  grad.addColorStop(1, 'rgba(255, 60, 20, 0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 124, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Spiral spark arms
+  ctx.strokeStyle = '#fff8dc';
+  ctx.lineWidth = 4;
+  for (let arm = 0; arm < 6; arm++) {
+    ctx.beginPath();
+    const baseAngle = (arm / 6) * Math.PI * 2;
+    for (let t = 0; t < 1; t += 0.05) {
+      const r = t * 115;
+      const a = baseAngle + t * 3.2;
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      if (t === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
 
 export function createWoodPlankTexture(renderer: THREE.WebGLRenderer): THREE.CanvasTexture {
