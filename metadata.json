@@ -1,6 +1,6 @@
 {
   "name": "Diwali Mela Online — Mela Chaloge Mere Sath?",
-  "description": "Enter an interactive 3D Diwali Mela in your browser. Walk through glowing diya-lit stalls, play balloon shooting and ring toss, eat garam jalebi and chaat, ride the giant wheel, light earthen diyas, and celebrate the Akashdeep sky lantern and fireworks finale.",
+  "description": "India's virtual Diwali mela in your browser! Roam the mela, play games, visit stalls, light patakhe & diyas with friends. Free, no download. Diwali 2026.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

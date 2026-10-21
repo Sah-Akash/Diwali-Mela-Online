@@ -103,12 +103,21 @@ export const PostcardModal: React.FC<PostcardModalProps> = ({
       );
 
       ctx.fillStyle = '#b9a37e';
-      ctx.font = '500 17px "DM Sans", sans-serif';
+      ctx.font = '500 16px "DM Sans", sans-serif';
       ctx.fillText(
-        `Items collected: ${stats.items.slice(0, 5).join(' · ')}`,
+        `Items collected: ${stats.items.slice(0, 4).join(' · ')}`,
         56,
-        615
+        612
       );
+
+      // Site Name + Link stamped on every shared postcard (SEO Sharing Engine)
+      const siteUrl =
+        typeof window !== 'undefined' && window.location.host
+          ? window.location.host
+          : 'diwali-mela-online.vercel.app';
+      ctx.fillStyle = '#f4b855';
+      ctx.font = '700 17px "JetBrains Mono", monospace';
+      ctx.fillText(`🪔 Diwali Mela Online · ${siteUrl}`, 56, 654);
 
       setCardDataUrl(canvas.toDataURL('image/png'));
     };

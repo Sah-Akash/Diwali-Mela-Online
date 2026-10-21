@@ -41,6 +41,11 @@ import {
 import { PostcardModal } from './components/PostcardModal';
 import { StallBuilderModal } from './components/StallBuilderModal';
 import { DaanPetiModal } from './components/DaanPetiModal';
+import {
+  SeoPagesDrawer,
+  SeoPageSlug,
+  resolveInitialSeoSlug,
+} from './components/SeoPagesDrawer';
 
 export default function App() {
   const canvasHostRef = useRef<HTMLDivElement | null>(null);
@@ -92,6 +97,31 @@ export default function App() {
   const [postcardSnapshot, setPostcardSnapshot] = useState<string | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
+
+  // Multi-page SEO route & drawer state
+  const [seoSlug, setSeoSlug] = useState<SeoPageSlug>(() => resolveInitialSeoSlug().slug);
+  const [seoOpen, setSeoOpen] = useState<boolean>(() => resolveInitialSeoSlug().openByDefault);
+
+  const handleNavigateSeoSlug = (slug: SeoPageSlug, openDrawer = true) => {
+    setSeoSlug(slug);
+    setSeoOpen(openDrawer);
+    if (typeof window !== 'undefined') {
+      const targetPath = slug === '404' ? '/' : slug;
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({}, '', targetPath);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const onPopState = () => {
+      const resolved = resolveInitialSeoSlug();
+      setSeoSlug(resolved.slug);
+      setSeoOpen(resolved.openByDefault);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   // Virtual Joystick state
   const [joyKnob, setJoyKnob] = useState({ x: 0, y: 0 });
@@ -482,15 +512,83 @@ export default function App() {
             </p>
           </div>
 
-          {/* Welcome Footer */}
-          <div className="flex flex-wrap items-center justify-between gap-4 text-[11px] tracking-wider text-[#d8c39e]">
-            <span>A little chaos. A little magic. Our kind of Diwali evening.</span>
-            <button
-              onClick={() => setSupportOpen(true)}
-              className="pointer-events-auto text-[#f1c17d] hover:underline cursor-pointer"
+          {/* Welcome Footer with Crawlable Internal Links to All 6 SEO Pages */}
+          <div className="flex flex-col gap-2 pointer-events-auto">
+            <nav
+              aria-label="Diwali 2026 Guides & SEO Pages"
+              className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[#e5c99b]"
             >
-              🪔 Daan Patra & Community Blessings ({communityDiyas} Diyas Lit) ↗
-            </button>
+              <a
+                href="/"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavigateSeoSlug('/', true);
+                }}
+                className="hover:text-white hover:underline cursor-pointer"
+              >
+                📖 Mela Guide &amp; FAQ
+              </a>
+              <a
+                href="/diwali-2026-date"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavigateSeoSlug('/diwali-2026-date', true);
+                }}
+                className="hover:text-white hover:underline cursor-pointer"
+              >
+                📅 Diwali 2026 Date &amp; Muhurat
+              </a>
+              <a
+                href="/light-a-diya-online"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavigateSeoSlug('/light-a-diya-online', true);
+                }}
+                className="hover:text-white hover:underline cursor-pointer"
+              >
+                🪔 Light a Diya Online
+              </a>
+              <a
+                href="/diwali-mela-games"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavigateSeoSlug('/diwali-mela-games', true);
+                }}
+                className="hover:text-white hover:underline cursor-pointer"
+              >
+                🎯 3D Diwali Games
+              </a>
+              <a
+                href="/diwali-wishes"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavigateSeoSlug('/diwali-wishes', true);
+                }}
+                className="hover:text-white hover:underline cursor-pointer"
+              >
+                ✨ Happy Diwali Wishes 2026
+              </a>
+              <a
+                href="/hindi"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavigateSeoSlug('/hindi', true);
+                }}
+                className="hover:text-white hover:underline cursor-pointer"
+              >
+                🇮🇳 दीवाली मेला ऑनलाइन (Hindi)
+              </a>
+            </nav>
+
+            <div className="flex flex-wrap items-center justify-between gap-4 text-[11px] tracking-wider text-[#d8c39e]">
+              <span>A little chaos. A little magic. Our kind of Diwali evening.</span>
+              <button
+                onClick={() => setSupportOpen(true)}
+                className="text-[#f1c17d] hover:underline cursor-pointer"
+              >
+                🪔 Seva Daan Peti &amp; Charity QR ({communityDiyas} Diyas Lit) ↗
+              </button>
+            </div>
           </div>
         </main>
       )}
@@ -1472,6 +1570,30 @@ export default function App() {
           onSwitchTab={(tab) => setStallModal(tab)}
         />
       )}
+
+      {/* MULTI-PAGE SEO GUIDE, DIWALI 2026 CALENDAR, WISHES & FAQ DRAWER */}
+      <SeoPagesDrawer
+        activeSlug={seoSlug}
+        isOpen={seoOpen}
+        onClose={() => {
+          setSeoOpen(false);
+          if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+            window.history.pushState({}, '', '/');
+          }
+          setSeoSlug('/');
+        }}
+        onNavigateSlug={handleNavigateSeoSlug}
+        onEnter3DAttraction={(attractionId) => {
+          if (mode === 'welcome') {
+            engineRef.current?.enterMela(attractionId);
+          } else if (attractionId) {
+            engineRef.current?.teleportTo(attractionId);
+          }
+        }}
+        onOpenDaanPeti={() => setSupportOpen(true)}
+        onToast={showToast}
+        communityDiyas={communityDiyas}
+      />
 
       {/* TOAST NOTIFICATION */}
       {toast && (
