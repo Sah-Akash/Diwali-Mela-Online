@@ -1,76 +1,188 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
   <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#090f1d" />
-      <stop offset="55%" stop-color="#131f38" />
-      <stop offset="100%" stop-color="#24192c" />
+    <linearGradient id="nightSky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#050914" />
+      <stop offset="45%" stop-color="#0f1b33" />
+      <stop offset="80%" stop-color="#22172b" />
+      <stop offset="100%" stop-color="#17101f" />
     </linearGradient>
-    <radialGradient id="moonGlow" cx="78%" cy="38%" r="36%">
-      <stop offset="0%" stop-color="#ffcf70" stop-opacity="0.45" />
-      <stop offset="60%" stop-color="#f1aa49" stop-opacity="0.12" />
-      <stop offset="100%" stop-color="#090f1d" stop-opacity="0" />
+    <radialGradient id="melaGlow" cx="74%" cy="46%" r="48%">
+      <stop offset="0%" stop-color="#ffbe55" stop-opacity="0.48" />
+      <stop offset="45%" stop-color="#f1aa49" stop-opacity="0.18" />
+      <stop offset="100%" stop-color="#050914" stop-opacity="0" />
     </radialGradient>
+    <radialGradient id="diyaHalo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffe89e" stop-opacity="0.95" />
+      <stop offset="50%" stop-color="#ff9924" stop-opacity="0.45" />
+      <stop offset="100%" stop-color="#ff9924" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="goldGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffe299" />
+      <stop offset="50%" stop-color="#f1aa49" />
+      <stop offset="100%" stop-color="#c97a1d" />
+    </linearGradient>
   </defs>
 
-  <!-- Night Sky Background -->
-  <rect width="1200" height="630" fill="url(#sky)" />
-  <rect width="1200" height="630" fill="url(#moonGlow)" />
+  <!-- Night Sky & Warm Mela Horizon Glow -->
+  <rect width="1200" height="630" fill="url(#nightSky)" />
+  <rect width="1200" height="630" fill="url(#melaGlow)" />
 
-  <!-- Outer Festive Zari Frame -->
-  <rect x="24" y="24" width="1152" height="582" rx="22" fill="none" stroke="#f1aa49" stroke-width="3" stroke-opacity="0.65" />
-  <rect x="34" y="34" width="1132" height="562" rx="16" fill="none" stroke="#ffd27d" stroke-width="1" stroke-opacity="0.3" />
+  <!-- Ground Fairground Courtyard -->
+  <path d="M0,490 Q600,465 1200,495 L1200,630 L0,630 Z" fill="#120d1c" />
+  <path d="M0,500 Q600,475 1200,505" fill="none" stroke="#f1aa49" stroke-width="2" stroke-opacity="0.4" />
 
-  <!-- Floating Akashdeep Sky Lanterns -->
-  <g fill="#ffcf70" opacity="0.85">
-    <circle cx="680" cy="110" r="7" />
-    <circle cx="760" cy="85" r="5" />
-    <circle cx="1040" cy="95" r="8" />
-    <circle cx="1110" cy="160" r="6" />
-    <circle cx="620" cy="180" r="5" />
-    <circle cx="850" cy="70" r="6" />
+  <!-- Starry Sky & Floating Akashdeep Sky Lanterns -->
+  <g fill="#fff4d2" opacity="0.7">
+    <circle cx="140" cy="70" r="1.8" />
+    <circle cx="290" cy="54" r="1.5" />
+    <circle cx="460" cy="82" r="2" />
+    <circle cx="610" cy="48" r="1.6" />
+    <circle cx="820" cy="42" r="2" />
+    <circle cx="1090" cy="66" r="1.8" />
   </g>
 
-  <!-- Illustrated Giant Ferris Wheel (Chand Wala Jhoola) on Right -->
-  <g transform="translate(930, 310)">
-    <circle cx="0" cy="0" r="165" fill="none" stroke="#f1aa49" stroke-width="6" />
-    <circle cx="0" cy="0" r="142" fill="none" stroke="#ff6fa5" stroke-width="2.5" stroke-dasharray="10 8" />
-    <circle cx="0" cy="0" r="20" fill="#f1aa49" />
-    <g stroke="#ffd27d" stroke-width="2" opacity="0.75">
-      <line x1="-165" y1="0" x2="165" y2="0" />
-      <line x1="0" y1="-165" x2="0" y2="165" />
-      <line x1="-116" y1="-116" x2="116" y2="116" />
-      <line x1="-116" y1="116" x2="116" y2="-116" />
+  <!-- Celebratory Fireworks Burst in Upper Sky -->
+  <g transform="translate(690, 125)" stroke="#ffd27d" stroke-width="2" opacity="0.85">
+    <circle cx="0" cy="0" r="4" fill="#fff8de" />
+    <line x1="0" y1="-38" x2="0" y2="-12" />
+    <line x1="0" y1="12" x2="0" y2="38" />
+    <line x1="-38" y1="0" x2="-12" y2="0" />
+    <line x1="12" y1="0" x2="38" y2="0" />
+    <line x1="-27" y1="-27" x2="-9" y2="-9" />
+    <line x1="9" y1="9" x2="27" y2="27" />
+    <line x1="27" y1="-27" x2="9" y2="-9" />
+    <line x1="-9" y1="9" x2="-27" y2="27" />
+    <circle cx="0" cy="0" r="28" fill="none" stroke="#ff6fa5" stroke-dasharray="4 6" />
+  </g>
+
+  <!-- Floating Glowing Sky Lanterns (Akashdeep) -->
+  <g>
+    <g transform="translate(595, 175)">
+      <circle cx="0" cy="0" r="18" fill="url(#diyaHalo)" />
+      <rect x="-6" y="-8" width="12" height="15" rx="4" fill="#ffae34" stroke="#fff3c4" stroke-width="1" />
     </g>
-    <line x1="-85" y1="220" x2="0" y2="0" stroke="#e09f3e" stroke-width="9" />
-    <line x1="85" y1="220" x2="0" y2="0" stroke="#e09f3e" stroke-width="9" />
+    <g transform="translate(765, 82)">
+      <circle cx="0" cy="0" r="16" fill="url(#diyaHalo)" />
+      <rect x="-5" y="-7" width="10" height="13" rx="3" fill="#ffae34" stroke="#fff3c4" stroke-width="1" />
+    </g>
+    <g transform="translate(1075, 118)">
+      <circle cx="0" cy="0" r="20" fill="url(#diyaHalo)" />
+      <rect x="-6" y="-8" width="12" height="15" rx="4" fill="#ffae34" stroke="#fff3c4" stroke-width="1" />
+    </g>
+    <g transform="translate(1125, 205)">
+      <circle cx="0" cy="0" r="15" fill="url(#diyaHalo)" />
+      <rect x="-5" y="-6" width="10" height="12" rx="3" fill="#ffae34" />
+    </g>
   </g>
 
-  <!-- Glowing Earthen Diya Illustration -->
-  <g transform="translate(755, 485)">
-    <path d="M-55,0 C-45,42 45,42 55,0 Z" fill="#b84a27" stroke="#f1aa49" stroke-width="3" />
-    <path d="M0,-42 C16,-18 14,2 0,4 C-14,2 -16,-18 0,-42 Z" fill="#ffdf78" />
+  <!-- Giant Illuminated Ferris Wheel (Chand Wala Jhoola) -->
+  <g transform="translate(955, 295)">
+    <circle cx="0" cy="0" r="180" fill="url(#diyaHalo)" opacity="0.28" />
+    <circle cx="0" cy="0" r="158" fill="none" stroke="#f1aa49" stroke-width="6" />
+    <circle cx="0" cy="0" r="136" fill="none" stroke="#ff6fa5" stroke-width="2.5" stroke-dasharray="10 8" />
+    <circle cx="0" cy="0" r="110" fill="none" stroke="#4cc9f0" stroke-width="2" stroke-dasharray="6 8" opacity="0.8" />
+    <g stroke="#ffd27d" stroke-width="2" opacity="0.8">
+      <line x1="-158" y1="0" x2="158" y2="0" />
+      <line x1="0" y1="-158" x2="0" y2="158" />
+      <line x1="-112" y1="-112" x2="112" y2="112" />
+      <line x1="-112" y1="112" x2="112" y2="-112" />
+    </g>
+    <!-- Gondola Cabins -->
+    <g fill="#ff9f1c" stroke="#fff5de" stroke-width="1.5">
+      <rect x="-12" y="-170" width="24" height="18" rx="4" />
+      <rect x="-12" y="152" width="24" height="18" rx="4" />
+      <rect x="-172" y="-9" width="24" height="18" rx="4" />
+      <rect x="148" y="-9" width="24" height="18" rx="4" />
+      <rect x="100" y="-124" width="22" height="16" rx="4" fill="#ff6fa5" />
+      <rect x="-122" y="-124" width="22" height="16" rx="4" fill="#4cc9f0" />
+      <rect x="100" y="108" width="22" height="16" rx="4" fill="#4cc9f0" />
+      <rect x="-122" y="108" width="22" height="16" rx="4" fill="#ff6fa5" />
+    </g>
+    <circle cx="0" cy="0" r="22" fill="#f1aa49" stroke="#fff5de" stroke-width="3" />
+    <line x1="-82" y1="210" x2="0" y2="0" stroke="#e09f3e" stroke-width="9" />
+    <line x1="82" y1="210" x2="0" y2="0" stroke="#e09f3e" stroke-width="9" />
   </g>
 
-  <!-- Left Editorial Typography -->
-  <text x="84" y="128" fill="#f1aa49" font-family="sans-serif" font-size="18" font-weight="700" letter-spacing="4">
-    DIWALI 2026 · VIRTUAL 3D INDIAN FAIRGROUND
+  <!-- 7 Diyas Deepotsav Mandap & Temple Spire in Midground -->
+  <g transform="translate(725, 395)">
+    <!-- Golden Kalash Dome -->
+    <polygon points="0,-105 -48,-45 48,-45" fill="#d97724" stroke="#ffd27d" stroke-width="2.5" />
+    <polygon points="0,-125 -8,-105 8,-105" fill="#ffe299" />
+    <!-- Mandap Pillars -->
+    <rect x="-38" y="-45" width="8" height="75" fill="#e09f3e" />
+    <rect x="30" y="-45" width="8" height="75" fill="#e09f3e" />
+    <rect x="-56" y="30" width="112" height="18" rx="4" fill="#8c2d19" stroke="#f1aa49" stroke-width="2" />
+    <!-- Hanging Temple Bell -->
+    <path d="M-8,-22 L8,-22 L12,-8 L-12,-8 Z" fill="#ffd27d" />
+    <circle cx="0" cy="-5" r="3" fill="#fff6e0" />
+  </g>
+
+  <!-- Illuminated Rangoli & Glowing Earthen Diyas on Foreground Floor -->
+  <g transform="translate(780, 535)">
+    <ellipse cx="0" cy="0" rx="145" ry="36" fill="#2a142d" stroke="#f1aa49" stroke-width="2" />
+    <ellipse cx="0" cy="0" rx="105" ry="25" fill="#8f1d58" stroke="#ff9f1c" stroke-width="1.5" stroke-dasharray="8 5" />
+    <ellipse cx="0" cy="0" rx="60" ry="15" fill="#136f63" stroke="#ffd27d" stroke-width="1.5" />
+    <!-- 5 Foreground Glowing Diyas -->
+    <g transform="translate(-110, 4)">
+      <circle cx="0" cy="-14" r="22" fill="url(#diyaHalo)" />
+      <path d="M-18,0 C-14,14 14,14 18,0 Z" fill="#b84a27" stroke="#ffd27d" stroke-width="1.5" />
+      <path d="M0,-18 C6,-8 5,1 0,2 C-5,1 -6,-8 0,-18 Z" fill="#fff2a6" />
+    </g>
+    <g transform="translate(-55, 14)">
+      <circle cx="0" cy="-16" r="24" fill="url(#diyaHalo)" />
+      <path d="M-20,0 C-15,15 15,15 20,0 Z" fill="#b84a27" stroke="#ffd27d" stroke-width="1.5" />
+      <path d="M0,-20 C7,-9 6,1 0,2 C-6,1 -7,-9 0,-20 Z" fill="#fff2a6" />
+    </g>
+    <g transform="translate(0, 18)">
+      <circle cx="0" cy="-22" r="34" fill="url(#diyaHalo)" />
+      <path d="M-28,0 C-22,22 22,22 28,0 Z" fill="#c84b24" stroke="#ffd27d" stroke-width="2" />
+      <path d="M0,-28 C10,-12 9,2 0,3 C-9,2 -10,-12 0,-28 Z" fill="#fff6c2" />
+    </g>
+    <g transform="translate(55, 14)">
+      <circle cx="0" cy="-16" r="24" fill="url(#diyaHalo)" />
+      <path d="M-20,0 C-15,15 15,15 20,0 Z" fill="#b84a27" stroke="#ffd27d" stroke-width="1.5" />
+      <path d="M0,-20 C7,-9 6,1 0,2 C-6,1 -7,-9 0,-20 Z" fill="#fff2a6" />
+    </g>
+    <g transform="translate(110, 4)">
+      <circle cx="0" cy="-14" r="22" fill="url(#diyaHalo)" />
+      <path d="M-18,0 C-14,14 14,14 18,0 Z" fill="#b84a27" stroke="#ffd27d" stroke-width="1.5" />
+      <path d="M0,-18 C6,-8 5,1 0,2 C-5,1 -6,-8 0,-18 Z" fill="#fff2a6" />
+    </g>
+  </g>
+
+  <!-- Outer Zari Border -->
+  <rect x="22" y="22" width="1156" height="586" rx="20" fill="none" stroke="url(#goldGrad)" stroke-width="3" stroke-opacity="0.78" />
+  <rect x="32" y="32" width="1136" height="566" rx="14" fill="none" stroke="#ffd27d" stroke-width="1" stroke-opacity="0.32" />
+
+  <!-- Left Editorial Branding & WhatsApp Share Preview Copy -->
+  <rect x="68" y="84" width="390" height="34" rx="17" fill="#17243d" stroke="#f1aa49" stroke-width="1.2" />
+  <text x="263" y="106" text-anchor="middle" fill="#ffd27d" font-family="sans-serif" font-size="14" font-weight="700" letter-spacing="2.5">
+    VIRTUAL DIWALI MELA 2026 · 3D BROWSER
   </text>
-  <text x="84" y="230" fill="#fff6e0" font-family="Georgia, serif" font-size="76" font-weight="700">
+
+  <text x="68" y="198" fill="#fff6e0" font-family="Georgia, serif" font-size="68" font-weight="700">
     Diwali Mela Online
   </text>
-  <text x="84" y="302" fill="#f1c17d" font-family="Georgia, serif" font-style="italic" font-size="44">
+  <text x="68" y="262" fill="#f1c17d" font-family="Georgia, serif" font-style="italic" font-size="40">
     Mela chaloge mere sath? ♥
   </text>
-  <text x="84" y="378" fill="#e5d1b0" font-family="sans-serif" font-size="24">
-    Roam the 3D Mela · Play Balloon Shoot &amp; Ring Toss · Paint Floor Rangoli
+
+  <text x="68" y="330" fill="#ebdcc2" font-family="sans-serif" font-size="22">
+    • Light 7 Diyas &amp; Perform Maha-Aarti
   </text>
-  <text x="84" y="416" fill="#e5d1b0" font-family="sans-serif" font-size="24">
-    Light 7 Diyas · Ride Giant Wheel &amp; Maut Ka Kuan · 1008 Akashdeep Finale
+  <text x="68" y="366" fill="#ebdcc2" font-family="sans-serif" font-size="22">
+    • Balloon Shoot, Ring Toss &amp; 3D Floor Rangoli
+  </text>
+  <text x="68" y="402" fill="#ebdcc2" font-family="sans-serif" font-size="22">
+    • Giant Wheel, Maut Ka Kuan &amp; 1008 Sky Lanterns
+  </text>
+  <text x="68" y="438" fill="#ebdcc2" font-family="sans-serif" font-size="22">
+    • Burst Patakhe &amp; Visit Festive Mithai Stalls
   </text>
 
-  <!-- CTA Pill -->
-  <rect x="84" y="466" width="440" height="68" rx="14" fill="#f1aa49" />
-  <text x="304" y="509" text-anchor="middle" fill="#121726" font-family="sans-serif" font-size="24" font-weight="800" letter-spacing="1.5">
-    FREE IN BROWSER · NO DOWNLOAD →
+  <!-- Golden CTA Button -->
+  <rect x="68" y="476" width="465" height="66" rx="14" fill="url(#goldGrad)" />
+  <text x="300" y="518" text-anchor="middle" fill="#121726" font-family="sans-serif" font-size="23" font-weight="800" letter-spacing="1.2">
+    PLAY FREE IN BROWSER · NO DOWNLOAD →
   </text>
 </svg>

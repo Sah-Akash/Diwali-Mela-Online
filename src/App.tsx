@@ -559,14 +559,14 @@ export default function App() {
               THE DIWALI MELA IS OPEN · EVERY GAME IS FREE
             </div>
 
-            <h1
+            <div
               className="font-display font-medium text-[#fff6e0] leading-[1.08] tracking-tight mb-4"
               style={{ fontSize: 'clamp(2.75rem, 5.2vw, 4.75rem)', textWrap: 'balance' }}
             >
               मेरा
               <br />
               <em className="font-normal text-[#f1c17d]">Diwali Mela.</em>
-            </h1>
+            </div>
 
             <p className="font-display italic text-xl sm:text-2xl text-[#eed9b9] mb-6">
               {invitedByName ? `${invitedByName} says: Mela chaloge mere sath? ` : 'Mela chaloge mere sath? '}
@@ -661,61 +661,41 @@ export default function App() {
               className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[#e5c99b]"
             >
               <a
-                href="/"
+                href="#mela-guide"
                 onClick={(e) => {
                   e.preventDefault();
                   handleNavigateSeoSlug('/', true);
                 }}
-                className="hover:text-white hover:underline cursor-pointer"
+                className="font-semibold text-[#ffd27d] hover:text-white hover:underline cursor-pointer"
               >
-                📖 Mela Guide &amp; FAQ
+                📖 About / Mela Guide &amp; FAQ
               </a>
               <a
-                href="/diwali-2026-date"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleNavigateSeoSlug('/diwali-2026-date', true);
-                }}
+                href="/diwali-2026-date.html"
                 className="hover:text-white hover:underline cursor-pointer"
               >
                 📅 Diwali 2026 Date &amp; Muhurat
               </a>
               <a
-                href="/light-a-diya-online"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleNavigateSeoSlug('/light-a-diya-online', true);
-                }}
+                href="/light-a-diya-online.html"
                 className="hover:text-white hover:underline cursor-pointer"
               >
                 🪔 Light a Diya Online
               </a>
               <a
-                href="/diwali-mela-games"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleNavigateSeoSlug('/diwali-mela-games', true);
-                }}
+                href="/diwali-mela-games.html"
                 className="hover:text-white hover:underline cursor-pointer"
               >
                 🎯 3D Diwali Games
               </a>
               <a
-                href="/diwali-wishes"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleNavigateSeoSlug('/diwali-wishes', true);
-                }}
+                href="/diwali-wishes.html"
                 className="hover:text-white hover:underline cursor-pointer"
               >
                 ✨ Happy Diwali Wishes 2026
               </a>
               <a
-                href="/hindi"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleNavigateSeoSlug('/hindi', true);
-                }}
+                href="/hindi.html"
                 className="hover:text-white hover:underline cursor-pointer"
               >
                 🇮🇳 दीवाली मेला ऑनलाइन (Hindi)

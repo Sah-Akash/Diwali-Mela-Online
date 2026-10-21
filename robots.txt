@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Sitemap for Diwali Mela Online (2026 Edition)
+Sitemap: https://diwali-mela-online.vercel.app/sitemap.xml

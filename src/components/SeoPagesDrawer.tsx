@@ -34,8 +34,8 @@ const VALID_SLUGS: SeoPageSlug[] = [
 
 export function resolveInitialSeoSlug(): { slug: SeoPageSlug; openByDefault: boolean } {
   if (typeof window === 'undefined') return { slug: '/', openByDefault: false };
-  const rawPath = window.location.pathname.replace(/\/+$/, '') || '/';
-  if (rawPath === '/') {
+  const rawPath = window.location.pathname.replace(/\.html$/i, '').replace(/\/+$/, '') || '/';
+  if (rawPath === '/' || rawPath === '/index') {
     return { slug: '/', openByDefault: false };
   }
   if ((VALID_SLUGS as string[]).includes(rawPath)) {
@@ -197,14 +197,16 @@ export const SeoPagesDrawer: React.FC<SeoPagesDrawerProps> = ({
     window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
 
-  if (!isOpen) return null;
-
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-[#070b14]/90 pointer-events-auto"
-      role="dialog"
-      aria-modal="true"
-      aria-label={SEO_PAGE_META[activeSlug]?.title || 'Diwali Mela Online Guide'}
+      className={
+        isOpen
+          ? 'fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-[#070b14]/90 pointer-events-auto'
+          : 'sr-only'
+      }
+      role={isOpen ? 'dialog' : 'region'}
+      aria-modal={isOpen ? 'true' : undefined}
+      aria-label={SEO_PAGE_META[activeSlug]?.title || 'Diwali Mela Online Guide & FAQ'}
     >
       <div className="relative w-full max-w-5xl max-h-[92vh] flex flex-col rounded-2xl bg-[#11192b] border-2 border-[#f1aa49]/55 text-[#f7e7c4] shadow-2xl overflow-hidden">
         {/* Top Navigation Header with Internal Links to All 6 SEO Pages */}
@@ -267,15 +269,15 @@ export const SeoPagesDrawer: React.FC<SeoPagesDrawerProps> = ({
 
         {/* Scrollable Semantic Article Body */}
         <article className="p-6 sm:p-8 overflow-y-auto space-y-8 leading-relaxed text-sm text-[#e6d5b8]">
-          {/* PAGE 1: HOMEPAGE SEO GUIDE & FAQ (/) — 650+ words, H1/H2 hierarchy, first 100 words optimized */}
+          {/* PAGE 1: HOMEPAGE SEO GUIDE & FAQ (/) — 650+ words, H1/H2 hierarchy, Command 4, 5, 6 */}
           {activeSlug === '/' && (
             <div className="space-y-7">
               <header className="space-y-3 border-b border-[#f1aa49]/25 pb-5">
                 <div className="text-xs font-bold tracking-widest text-[#f1aa49]">
-                  VIRTUAL DIWALI MELA 2026 · FREE 3D BROWSER EXPERIENCE
+                  ABOUT DIWALI MELA ONLINE · FREE 3D BROWSER EXPERIENCE
                 </div>
                 <h1 className="text-2xl sm:text-4xl font-display font-bold text-[#fff5de]">
-                  Diwali Mela Online — Mela Chaloge Mere Sath?
+                  Diwali Mela Online — Virtual Diwali Mela 2026
                 </h1>
                 {/* First 100 words containing: diwali mela online, free, 3D, Diwali 2026, no download */}
                 <p className="text-sm sm:text-base text-[#f3e3c6] leading-relaxed">
@@ -285,14 +287,15 @@ export const SeoPagesDrawer: React.FC<SeoPagesDrawerProps> = ({
                   with <strong>no download</strong> required, this <strong>free</strong> virtual Diwali
                   mela invites you, your friends, and your family to walk through glowing lantern-lit
                   bazaar lanes, play nostalgic Indian fair games, paint floor rangoli, light earthen
-                  diyas, and watch 1,008 Akashdeep sky lanterns rise into the night sky.
+                  diyas, burst eco-friendly patakhe, and watch 1,008 Akashdeep sky lanterns rise into
+                  the starry night sky.
                 </p>
               </header>
 
               {/* Featured Image with Natural Keyword Alt Text */}
               <figure className="rounded-2xl overflow-hidden border border-[#f1aa49]/35 bg-[#0b101d]">
                 <img
-                  src="/diwali-mela-online-game.svg"
+                  src="/og-image.jpg"
                   alt="virtual diwali mela ferris wheel at night with glowing earthen diyas and sky lanterns"
                   className="w-full h-auto max-h-72 object-cover block"
                   loading="lazy"
@@ -302,15 +305,18 @@ export const SeoPagesDrawer: React.FC<SeoPagesDrawerProps> = ({
                 </figcaption>
               </figure>
 
-              {/* H2 Section 1: Games */}
+              {/* H2 Section 1: What Diwali Mela Online Is & Full Games List */}
               <section className="space-y-3">
                 <h2 className="text-xl sm:text-2xl font-display font-bold text-[#fff5de]">
-                  Games at the Virtual Diwali Mela
+                  What is Diwali Mela Online &amp; Full List of 3D Mela Games
                 </h2>
                 <p>
-                  Every game inside our <strong>online Diwali mela game</strong> is 100% free to play
-                  as many times as you like. Whether you miss the thrill of aiming at colourful balloons
-                  or tossing rings at shiny prizes, each attraction is crafted in real-time 3D:
+                  Remember childhood Diwali evenings when the entire neighborhood dressed up and walked
+                  under marigold torans to the town fairground? <strong>Diwali Mela Online</strong>{' '}
+                  brings that nostalgic community celebration into a real-time 3D browser world so
+                  families, college hostel friends, and loved ones living across different cities can
+                  celebrate together. Every game and ride inside our <strong>online Diwali mela game</strong>{' '}
+                  is 100% free:
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div className="p-4 rounded-xl bg-[#0b101d] border border-[#f1aa49]/25">
@@ -318,7 +324,7 @@ export const SeoPagesDrawer: React.FC<SeoPagesDrawerProps> = ({
                       1. Nishana Lagao · Balloon Shooting Stall
                     </h3>
                     <p className="text-xs text-[#d8c39e]">
-                      Step up to the colorful target board and pop balloons with 3 free shots to win the virtual Diwali Teddy Prize for your Mela Jhola.
+                      Step up to the colorful wooden target board and pop moving balloons with 3 free shots per round to win the virtual Diwali Teddy Prize for your Mela Jhola.
                     </p>
                   </div>
                   <div className="p-4 rounded-xl bg-[#0b101d] border border-[#f1aa49]/25">
@@ -326,7 +332,7 @@ export const SeoPagesDrawer: React.FC<SeoPagesDrawerProps> = ({
                       2. Swarna Challa · Golden Ring Toss
                     </h3>
                     <p className="text-xs text-[#d8c39e]">
-                      Toss 5 golden rings onto traditional Diwali pedestals and win the Swarna Challa Trophy.
+                      Toss 5 spinning golden rings onto traditional Diwali prize pedestals in 3D space to win the Swarna Challa Trophy.
                     </p>
                   </div>
                   <div className="p-4 rounded-xl bg-[#0b101d] border border-[#f1aa49]/25">
@@ -339,33 +345,53 @@ export const SeoPagesDrawer: React.FC<SeoPagesDrawerProps> = ({
                   </div>
                   <div className="p-4 rounded-xl bg-[#0b101d] border border-[#f1aa49]/25">
                     <h3 className="font-semibold text-[#f1aa49] mb-1">
-                      4. Maut Ka Kuan &amp; Giant Rides
+                      4. 7 Diyas Mandap, Temple Bell &amp; Maha-Aarti
                     </h3>
                     <p className="text-xs text-[#d8c39e]">
-                      Drive the vertical wooden wall of the Well of Death to collect 8 golden rings, or board the Chand Wala Jhoola (Giant Ferris Wheel), Royal Carousel, and Peacock Ship.
+                      Tap the 7 earthen clay diyas to ignite their flames, ring the brass Mandir Ghanti, and perform a clockwise golden Maha-Aarti around the central Mandap.
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-[#0b101d] border border-[#f1aa49]/25">
+                    <h3 className="font-semibold text-[#f1aa49] mb-1">
+                      5. Maut Ka Kuan &amp; Giant Carnival Rides
+                    </h3>
+                    <p className="text-xs text-[#d8c39e]">
+                      Steer the stunt car on the vertical wooden wall of the Well of Death to collect 8 golden rings in 20 seconds, or ride the Giant Ferris Wheel, Royal Carousel, and Peacock Ship.
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-[#0b101d] border border-[#f1aa49]/25">
+                    <h3 className="font-semibold text-[#f1aa49] mb-1">
+                      6. Patakha Zone &amp; Wish Sky Lanterns
+                    </h3>
+                    <p className="text-xs text-[#d8c39e]">
+                      Ignite 3D Anaar fountains, spinning Ground Chakris, and Sky Rockets on the Patakha Pad, wave your handheld Phuljhari, or launch a personalized Wish Sky Lantern.
                     </p>
                   </div>
                 </div>
               </section>
 
-              {/* H2 Section 2: Stalls */}
+              {/* H2 Section 2: How Shops Can Book a Stall & Festive Bazaar */}
               <section className="space-y-3">
                 <h2 className="text-xl sm:text-2xl font-display font-bold text-[#fff5de]">
-                  Stalls, Mithai Bazaar &amp; Seva Daan Peti
+                  How Shops Can Book a Stall in the Mela &amp; Explore the Bazaar
                 </h2>
                 <p>
-                  No Indian fair is complete without the aroma of warm sweets, spicy chaat, and lively
-                  banter with shopkeepers. Walk down the central bazaar lane to taste virtual silver-leaf
-                  Kaju Katli, Motichoor Ladoo, crispy Kesar Jalebi, Banarasi Tamatar Chaat, Matka Malai
-                  Kulfi, and Kulhad Masala Chai. Stop by the toy and terracotta craft stalls to bargain
-                  playfully with vendors, pick up a glowing handheld <strong>Golden Phuljhari</strong>{' '}
-                  sparkler, or set up your own 3D brand stall using our interactive Stall Builder.
+                  Walk down the lively bazaar lane to taste virtual silver-leaf Kaju Katli, crispy Kesar
+                  Jalebi, Banarasi Tamatar Chaat, Kala Khatta Baraf Gola, Matka Malai Kulfi, and explore
+                  the Suhaag Glass Bangle &amp; Mehendi stall. Friendly mela visitors roam the lanes,
+                  sit at chaat tables, and greet you with <em>&ldquo;Happy Diwali!&rdquo;</em> whenever
+                  you click on them. Right beside the 7 Diyas Mandap rests the brass-bound{' '}
+                  <strong>Seva Daan Peti</strong>, where you can scan the charity QR code to help
+                  provide warm meals, sweets, and blankets for underprivileged families.
                 </p>
                 <p>
-                  Right next to the central <strong>7 Diyas Deepotsav Mandap</strong>, you will also find
-                  the traditional brass-bound <strong>Seva Daan Peti</strong>—where visitors can scan the
-                  verified UPI QR code to contribute towards warm meals, sweets, earthen diyas, and winter
-                  blankets for underprivileged families this Diwali.
+                  <strong>Book Your Own 3D Shop Stall:</strong> Small businesses, D2C brands, artisans,
+                  and creators can book and customize a 3D stall right inside the mela! Simply click{' '}
+                  <strong>&ldquo;Promote your shop · Setup 3D Stall&rdquo;</strong> on the homepage or
+                  inside the top-right Diya Menu to launch the interactive 3D Stall Builder. Pick an
+                  available plot along the main bazaar, enter your shop name, specialty product, canopy
+                  color theme, and custom shopkeeper dialogue, and your 3D stall goes live immediately
+                  for visitors to explore.
                 </p>
               </section>
 
@@ -378,18 +404,21 @@ export const SeoPagesDrawer: React.FC<SeoPagesDrawerProps> = ({
                   <li>
                     <strong>On Mobile Phones &amp; Tablets:</strong> Use the bottom-left virtual thumb
                     joystick to walk, drag anywhere on the screen to look around the illuminated night
-                    sky, and tap the golden proximity button to talk to shopkeepers or start rides.
+                    sky, and tap the golden proximity button or directly on 3D stalls, crowd visitors,
+                    diyas, and games to interact.
                   </li>
                   <li>
                     <strong>On Laptop &amp; Desktop:</strong> Use <kbd className="px-1.5 py-0.5 rounded bg-[#0b101d] border border-[#f1aa49]/30">W A S D</kbd> or Arrow keys to walk, hold <kbd className="px-1.5 py-0.5 rounded bg-[#0b101d] border border-[#f1aa49]/30">Shift</kbd> to run, drag with your mouse to look around, and press <kbd className="px-1.5 py-0.5 rounded bg-[#0b101d] border border-[#f1aa49]/30">E</kbd> to interact.
                   </li>
                   <li>
-                    <strong>Invite Friends with a Mela Postcard:</strong> Click &ldquo;Invite · Postcard&rdquo; at any time to capture a live 3D snapshot, add your name and a heartfelt note, and share your custom postcard on WhatsApp or Instagram.
+                    <strong>Invite Friends with Your Name (?from=YourName):</strong> Open the top-right
+                    Diya Menu and click &ldquo;Invite Friends (?from=You)&rdquo; or &ldquo;Postcard&rdquo;
+                    to send a personalized WhatsApp invite link so the mela welcomes your friends by name!
                   </li>
                 </ul>
               </section>
 
-              {/* H2 Section 4: FAQ */}
+              {/* H2 Section 4: FAQ (Command 6 Exact 5 Questions Word-for-Word) */}
               <section className="space-y-3">
                 <h2 className="text-xl sm:text-2xl font-display font-bold text-[#fff5de] flex items-center gap-2">
                   <HelpCircle className="w-5 h-5 text-[#f1aa49]" />
@@ -398,20 +427,24 @@ export const SeoPagesDrawer: React.FC<SeoPagesDrawerProps> = ({
                 <div className="space-y-2.5">
                   {[
                     {
-                      q: 'Is Diwali Mela Online completely free?',
-                      a: 'Yes! Every game, ride, virtual mithai, sparkler, and downloadable postcard inside Diwali Mela Online is 100% free with no login and no app download.',
+                      q: 'Is Diwali Mela Online free?',
+                      a: 'Yes! Diwali Mela Online is 100% free to play in your mobile or desktop browser with no download and no login required. Every game, ride, virtual mithai stall, sparkler, and postcard is completely free.',
                     },
                     {
                       q: 'When is Diwali 2026?',
-                      a: 'Main Diwali (Lakshmi Puja) in 2026 will be celebrated on Sunday, 8 November 2026. The 5-day festival runs from Dhanteras on Friday, 6 November 2026 through Bhai Dooj on Tuesday, 10 November 2026.',
+                      a: 'In 2026, main Diwali (Lakshmi-Ganesh Puja) will be celebrated on Sunday, 8 November 2026. The 5-day festival runs from Dhanteras on Friday, 6 November 2026 through Bhai Dooj on Tuesday, 10 November 2026.',
                     },
                     {
-                      q: 'Can I celebrate Diwali online with friends and family?',
-                      a: 'Absolutely! You can explore the 3D fairgrounds, light the 7 Diyas at the Deepotsav Mandap, create a custom 3D Rangoli, and send personalized Diwali Mela Postcard invitations to your friends and family on WhatsApp.',
+                      q: 'How do I play the Diwali mela games?',
+                      a: 'Click "Enter Diwali Mela" to step into the 3D fairground. Walk up to any game stall using the mobile joystick or WASD keys (or tap a quick-teleport pill), then click or tap directly in 3D to pop balloons, toss golden rings, paint floor rangoli, or steer your stunt car inside Maut Ka Kuan.',
                     },
                     {
-                      q: 'How do I light a diya online in the 3D Mela?',
-                      a: 'Walk to the central Deepotsav Mandap (or click "7 Diyas Mandap" in the bottom dock) and tap each of the 7 earthen clay diyas around the Rangoli to ignite their golden flames and receive the Deepotsav Blessing.',
+                      q: 'Can I light a diya online for someone?',
+                      a: 'Yes! Walk to the central 7 Diyas Deepotsav Mandap and tap each of the 7 earthen clay diyas to ignite their golden flames, ring the temple bell, and perform Maha-Aarti. You can also launch a personalized Wish Sky Lantern with their name and send them a custom WhatsApp invitation link.',
+                    },
+                    {
+                      q: 'How do I book a stall in the mela?',
+                      a: 'Click "Promote your shop · Setup 3D Stall" on the welcome screen or inside the top-right Diya Menu to open the 3D Stall Builder. Select an open bazaar plot, customize your shop name, canopy colors, product specialty, and shopkeeper Q&A, and publish your 3D stall in the mela.',
                     },
                   ].map((item, i) => (
                     <div
@@ -431,55 +464,35 @@ export const SeoPagesDrawer: React.FC<SeoPagesDrawerProps> = ({
                 className="pt-4 border-t border-[#f1aa49]/25 flex flex-wrap items-center justify-between gap-3"
               >
                 <span className="text-xs font-semibold text-[#f1aa49]">
-                  EXPLORE MORE DIWALI 2026 PAGES:
+                  EXPLORE ALL 5 DIWALI 2026 GUIDE PAGES:
                 </span>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3">
                   <a
-                    href="/diwali-2026-date"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onNavigateSlug('/diwali-2026-date', true);
-                    }}
+                    href="/diwali-2026-date.html"
                     className="text-xs text-[#ffd27d] hover:underline"
                   >
                     Diwali 2026 Date &amp; Muhurat →
                   </a>
                   <a
-                    href="/light-a-diya-online"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onNavigateSlug('/light-a-diya-online', true);
-                    }}
+                    href="/light-a-diya-online.html"
                     className="text-xs text-[#ffd27d] hover:underline"
                   >
                     Light a Diya Online →
                   </a>
                   <a
-                    href="/diwali-mela-games"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onNavigateSlug('/diwali-mela-games', true);
-                    }}
+                    href="/diwali-mela-games.html"
                     className="text-xs text-[#ffd27d] hover:underline"
                   >
-                    3D Diwali Games →
+                    3D Diwali Mela Games →
                   </a>
                   <a
-                    href="/diwali-wishes"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onNavigateSlug('/diwali-wishes', true);
-                    }}
+                    href="/diwali-wishes.html"
                     className="text-xs text-[#ffd27d] hover:underline"
                   >
                     Happy Diwali Wishes 2026 →
                   </a>
                   <a
-                    href="/hindi"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onNavigateSlug('/hindi', true);
-                    }}
+                    href="/hindi.html"
                     className="text-xs text-[#ffd27d] hover:underline"
                   >
                     दीवाली मेला ऑनलाइन (Hindi) →
