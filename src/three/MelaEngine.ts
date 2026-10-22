@@ -115,7 +115,16 @@ interface MelaCrowdVisitor {
   leftArm: THREE.Object3D;
   rightArm: THREE.Object3D;
   greetingSprite: THREE.Sprite;
-  role: 'roaming' | 'sitting' | 'standing';
+  role:
+    | 'roaming'
+    | 'sitting'
+    | 'standing'
+    | 'riding-wheel'
+    | 'riding-carousel'
+    | 'riding-ship'
+    | 'well-spectator'
+    | 'playing-balloon'
+    | 'playing-ring';
   name: string;
   greetingText: string;
   voiceLine: string;
@@ -177,11 +186,15 @@ export class MelaEngine {
   private carouselPlatform!: THREE.Group;
   private carouselHorses: THREE.Object3D[] = [];
   private pirateShipPivot!: THREE.Group;
+  private pirateShipHull: THREE.Group | null = null;
+  private wellRoot: THREE.Group | null = null;
   private wellBikes: { group: THREE.Group; angle: number; height: number; speed: number }[] = [];
   private wellRings: { mesh: THREE.Mesh; angle: number; height: number; collected: boolean }[] = [];
 
   // Mini-game objects
   private balloonTargets: { mesh: THREE.Mesh; basePos: THREE.Vector3; popped: boolean; color: number }[] = [];
+  private npcBalloonSparkTimer = 0;
+  private npcRingMesh: THREE.Mesh | null = null;
   private ringFlight: {
     mesh: THREE.Mesh;
     active: boolean;
@@ -659,8 +672,11 @@ export class MelaEngine {
     this.mandapDiyas = [];
     this.ferrisGondolas = [];
     this.carouselHorses = [];
+    this.pirateShipHull = null;
+    this.wellRoot = null;
     this.wellBikes = [];
     this.wellRings = [];
+    this.npcRingMesh = null;
     this.rangoliSegments = [];
     this.rangoliBowls = [];
     this.rangoliGroup = null;
@@ -1060,6 +1076,12 @@ export class MelaEngine {
       end: new THREE.Vector3(),
       willWin: true,
     };
+
+    // Ambient NPC flying ring so visitors walking past see players tossing rings onto pegs
+    const npcRing = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.032, 10, 22), goldMat);
+    npcRing.rotation.x = Math.PI / 2;
+    this.dynamicRoot.add(npcRing);
+    this.npcRingMesh = npcRing;
 
     this.dynamicRoot.add(ringGroup);
   }
@@ -1703,6 +1725,7 @@ export class MelaEngine {
     }
 
     this.pirateShipPivot.add(hull);
+    this.pirateShipHull = hull;
     this.addContactShadow(root, 8, 10);
     this.dynamicRoot.add(root);
   }
@@ -1710,6 +1733,7 @@ export class MelaEngine {
   private buildWellOfDeath(spec: MelaInteractableSpec): void {
     const root = new THREE.Group();
     root.position.set(spec.x, 0, spec.z);
+    this.wellRoot = root;
 
     const plankTex = createWoodPlankTexture(this.renderer);
     const wallMat = new THREE.MeshStandardMaterial({
@@ -1718,6 +1742,7 @@ export class MelaEngine {
       side: THREE.DoubleSide,
     });
     const goldMat = new THREE.MeshStandardMaterial({ color: 0xf4b855, roughness: 0.3, metalness: 0.8 });
+    const darkMetalMat = new THREE.MeshStandardMaterial({ color: 0x1d222b, roughness: 0.4, metalness: 0.7 });
 
     const wellRadius = 7.2;
     const wellHeight = 7.0;
@@ -1730,31 +1755,93 @@ export class MelaEngine {
     cylinder.position.y = wellHeight / 2;
     root.add(cylinder);
 
-    // Top spectator balcony railing
-    const topRim = new THREE.Mesh(new THREE.TorusGeometry(wellRadius + 0.65, 0.22, 10, 36), goldMat);
+    // Top spectator balcony walkway deck & safety railings so crowds can stand on top and watch!
+    const galleryDeck = new THREE.Mesh(
+      new THREE.RingGeometry(wellRadius + 0.48, wellRadius + 1.75, 32),
+      new THREE.MeshStandardMaterial({ color: 0x5c341d, roughness: 0.8, side: THREE.DoubleSide })
+    );
+    galleryDeck.rotation.x = -Math.PI / 2;
+    galleryDeck.position.y = wellHeight - 0.04;
+    root.add(galleryDeck);
+
+    const topRim = new THREE.Mesh(new THREE.TorusGeometry(wellRadius + 0.65, 0.16, 10, 36), goldMat);
     topRim.rotation.x = Math.PI / 2;
-    topRim.position.y = wellHeight;
-    root.add(topRim);
+    topRim.position.y = wellHeight + 0.85;
+    const outerRim = new THREE.Mesh(new THREE.TorusGeometry(wellRadius + 1.7, 0.14, 10, 36), goldMat);
+    outerRim.rotation.x = Math.PI / 2;
+    outerRim.position.y = wellHeight + 0.85;
+    root.add(topRim, outerRim);
+
+    // Railing posts around the top spectator gallery
+    for (let p = 0; p < 16; p++) {
+      const a = (p / 16) * Math.PI * 2;
+      const innerPost = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.9, 8), goldMat);
+      innerPost.position.set(Math.cos(a) * (wellRadius + 0.65), wellHeight + 0.42, Math.sin(a) * (wellRadius + 0.65));
+      const outerPost = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.9, 8), goldMat);
+      outerPost.position.set(Math.cos(a) * (wellRadius + 1.7), wellHeight + 0.42, Math.sin(a) * (wellRadius + 1.7));
+      root.add(innerPost, outerPost);
+    }
 
     // Signboard outside the Well of Death
     const signTex = createSignboardTexture(
       this.renderer,
       'MAUT KA KUAN · मौत का कुआँ',
-      'Watch the Stunt Show or Ride the Wall!'
+      'Watch the Daredevil Riders or Ride the Wall!'
     );
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(6.8, 1.6), new THREE.MeshBasicMaterial({ map: signTex }));
     sign.position.set(-4.5, 4.8, 6.8);
     sign.rotation.y = -Math.PI / 5;
     root.add(sign);
 
-    // 2 Stunt Bikes racing inside the wooden wall
+    // 2 Stunt Motorcycles with 3D Daredevil Riders racing inside the vertical wooden wall!
     for (let i = 0; i < 2; i++) {
       const bike = new THREE.Group();
-      const body = new THREE.Mesh(
-        new THREE.BoxGeometry(0.5, 0.55, 1.5),
-        new THREE.MeshStandardMaterial({ color: i === 0 ? 0xff3b30 : 0xffcc00, roughness: 0.3, metalness: 0.6 })
-      );
+      const bikeColor = i === 0 ? 0xff2a2a : 0xffbe0b;
+      const bodyMat = new THREE.MeshStandardMaterial({ color: bikeColor, roughness: 0.28, metalness: 0.65 });
+
+      // Motorcycle frame & fuel tank
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.48, 1.45), bodyMat);
+      body.position.y = 0.15;
       bike.add(body);
+
+      // Front & rear tires
+      for (const wz of [-0.58, 0.58]) {
+        const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.09, 10, 18), darkMetalMat);
+        wheel.rotation.y = Math.PI / 2;
+        wheel.position.set(0, -0.05, wz);
+        bike.add(wheel);
+      }
+
+      // Handlebars & glowing headlight
+      const handlebar = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.72, 8), goldMat);
+      handlebar.rotation.z = Math.PI / 2;
+      handlebar.position.set(0, 0.52, -0.42);
+      const headlight = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 10, 10),
+        new THREE.MeshBasicMaterial({ color: 0xfff5cc })
+      );
+      headlight.position.set(0, 0.42, -0.75);
+      bike.add(handlebar, headlight);
+
+      // 3D Stunt Rider mounted on the motorcycle
+      const riderTorso = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.18, 0.22, 0.68, 10),
+        new THREE.MeshStandardMaterial({ color: i === 0 ? 0x1565c0 : 0xc2185b, roughness: 0.5 })
+      );
+      riderTorso.position.set(0, 0.68, 0.08);
+      riderTorso.rotation.x = -0.35;
+      const riderHead = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 12, 12),
+        new THREE.MeshStandardMaterial({ color: 0xd99b72, roughness: 0.6 })
+      );
+      riderHead.position.set(0, 1.08, -0.08);
+      const helmet = new THREE.Mesh(
+        new THREE.SphereGeometry(0.2, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.65),
+        goldMat
+      );
+      helmet.position.set(0, 1.12, -0.08);
+      bike.add(riderTorso, riderHead, helmet);
+
       root.add(bike);
       this.wellBikes.push({
         group: bike,
@@ -4293,7 +4380,10 @@ export class MelaEngine {
     balloonColor?: number;
     hasSparkler?: boolean;
     hasFoodItem?: 'jalebi' | 'chaat' | 'chai';
+    hasRifle?: boolean;
+    hasTossRing?: boolean;
     sitting?: boolean;
+    onRide?: boolean;
     name: string;
     greetingText: string;
   }): {
@@ -4529,6 +4619,36 @@ export class MelaEngine {
       }
     }
 
+    if (opts.hasRifle) {
+      // 3D Mela Air-Rifle (Wooden Stock + Brass Barrel) held aimed toward the balloon target board
+      const rifleGroup = new THREE.Group();
+      const stock = new THREE.Mesh(
+        new THREE.BoxGeometry(0.06, 0.12, 0.42),
+        new THREE.MeshStandardMaterial({ color: 0x5c3018, roughness: 0.7 })
+      );
+      stock.position.set(0, -0.48, 0.18);
+      const barrel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.018, 0.02, 0.65, 8),
+        new THREE.MeshStandardMaterial({ color: 0xd4a346, roughness: 0.3, metalness: 0.85 })
+      );
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(0, -0.45, 0.58);
+      rifleGroup.add(stock, barrel);
+      rightArm.add(rifleGroup);
+      rightArm.rotation.x = -1.42;
+      leftArm.rotation.x = -1.32;
+      leftArm.rotation.y = 0.25;
+    }
+
+    if (opts.hasTossRing) {
+      // Gleaming Golden Ring held in right hand for Swarna Challa Ring Toss game
+      const ringProp = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.026, 8, 18), goldMat);
+      ringProp.rotation.x = Math.PI / 2;
+      ringProp.position.set(0, -0.54, 0.16);
+      rightArm.add(ringProp);
+      rightArm.rotation.x = -1.05;
+    }
+
     bodyGroup.add(leftArm, rightArm);
 
     // Invisible click hitbox so tapping any person is effortless on mobile & desktop
@@ -4544,7 +4664,9 @@ export class MelaEngine {
     greetingSprite.position.set(0, 2.45 * scale, 0);
     group.add(greetingSprite);
 
-    this.addContactShadow(group, 1.15 * scale, 1.15 * scale);
+    if (!opts.onRide) {
+      this.addContactShadow(group, 1.15 * scale, 1.15 * scale);
+    }
 
     return {
       group,
@@ -4867,12 +4989,12 @@ export class MelaEngine {
         greetingText: 'शुभ दीपावली! बच्चों के लिए लकड़ी के खिलौने ले रहा हूँ!',
         voiceLine: 'Shubh Deepavali! Buying traditional wooden toys for the kids!',
       },
-      // Standing in front of Terracotta Diya Craft (-10.5, 6)
+      // Standing near Terracotta Diya Craft (12, -26)
       {
         name: 'Kavita Ji',
-        x: -7.2,
-        z: 6.3,
-        yaw: -Math.PI / 2,
+        x: 8.6,
+        z: -25.4,
+        yaw: Math.PI / 2,
         outfitColor: 0xd84315,
         secondaryColor: 0xffcc80,
         style: 'saree',
@@ -4880,31 +5002,184 @@ export class MelaEngine {
         greetingText: 'Happy Diwali! मिट्टी के दीयों से घर आँगन जगमगाएगा!',
         voiceLine: 'Happy Diwali! Handcrafted clay diyas bring true warmth to every home!',
       },
-      // Standing in front of Balloon Shooting Game (10.5, 6)
+      // Standing in front of Khilone & Phuljhari (-12, -26)
       {
-        name: 'Siddharth',
-        x: 7.2,
-        z: 5.8,
-        yaw: Math.PI / 2,
+        name: 'Chोटू & Papa',
+        x: -8.6,
+        z: -25.6,
+        yaw: -Math.PI / 2,
         outfitColor: 0x283593,
         secondaryColor: 0xffca28,
         style: 'kurta',
-        greetingText: 'Happy Diwali! गुब्बारे फोड़ने में किसका निशाना सबसे पक्का है?',
-        voiceLine: 'Happy Diwali! Let us see who gets the highest score in Gubbara Nishana!',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali! बच्चों के लिए फुलझड़ी और आकाश कंदील ले रहे हैं!',
+        voiceLine: 'Happy Diwali! Buying golden sparklers and lanterns for the kids!',
       },
-      // Standing in front of Ring Toss Stall (-10.5, -6)
+      // Cheering Friends watching Balloon Shooting Game at x: -24, z: 8
       {
-        name: 'Ananya',
-        x: -7.2,
-        z: -5.8,
-        yaw: -Math.PI / 2,
+        name: 'Kavya',
+        x: -20.2,
+        z: 6.3,
+        yaw: -Math.PI / 2 - 0.3,
         outfitColor: 0xc2185b,
         secondaryColor: 0xffe082,
         style: 'saree',
         hasBalloon: true,
+        balloonColor: 0xff4081,
+        greetingText: 'Happy Diwali! क्या निशाना लगाया है! एक और गुब्बारा फोड़ो!',
+        voiceLine: 'Happy Diwali! What a great shot at the balloon target board!',
+      },
+      {
+        name: 'Montu',
+        x: -20.2,
+        z: 9.7,
+        yaw: -Math.PI / 2 + 0.3,
+        outfitColor: 0x00897b,
+        secondaryColor: 0xffd54f,
+        style: 'child',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali! भैया ने लगातार तीन गुब्बारे फोड़े! 🎯',
+        voiceLine: 'Happy Diwali! Bhaiya popped three balloons in a row!',
+      },
+      // Cheering Friends watching Golden Ring Toss Stall at x: 24, z: 8
+      {
+        name: 'Tanya',
+        x: 20.2,
+        z: 6.3,
+        yaw: Math.PI / 2 + 0.3,
+        outfitColor: 0x8e24aa,
+        secondaryColor: 0xffca28,
+        style: 'saree',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali! वाह! सुनहरा छल्ला सीधा इनाम पर जा गिरा!',
+        voiceLine: 'Happy Diwali! The golden ring landed right on the Diwali prize!',
+      },
+      {
+        name: 'Bunty',
+        x: 20.2,
+        z: 9.7,
+        yaw: Math.PI / 2 - 0.3,
+        outfitColor: 0xf57c00,
+        secondaryColor: 0xfff59d,
+        style: 'child',
+        hasBalloon: true,
+        balloonColor: 0x00e5ff,
+        greetingText: 'Happy Diwali! अगला छल्ला मैं फेंकूँगा! 🪙',
+        voiceLine: 'Happy Diwali! Next turn is mine at the Golden Ring Toss!',
+      },
+      // Crowd admiring & queuing at Chand Wala Jhoola (Giant Ferris Wheel at x: 28, z: -24)
+      {
+        name: 'Deepak Bhaiya',
+        x: 21.8,
+        z: -19.5,
+        yaw: Math.PI * 0.72,
+        outfitColor: 0x1565c0,
+        secondaryColor: 0xffd54f,
+        style: 'kurta',
+        hasTurban: true,
+        greetingText: 'शुभ दीपावली! चाँद वाले विशाल झूले से पूरा मेला जगमगाता दिखता है!',
+        voiceLine: 'Shubh Deepavali! Look at everyone waving from the top of the Giant Ferris Wheel!',
+      },
+      {
+        name: 'Sonal',
+        x: 22.4,
+        z: -21.2,
+        yaw: Math.PI * 0.65,
+        outfitColor: 0xd81b60,
+        secondaryColor: 0xffe082,
+        style: 'saree',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali! ऊपर झूले में बैठे लोग कितने खुश लग रहे हैं!',
+        voiceLine: 'Happy Diwali! Everyone riding the Chand Wala Jhoola is having the time of their life!',
+      },
+      {
+        name: 'Nikhil',
+        x: 21.2,
+        z: -25.8,
+        yaw: Math.PI * 0.45,
+        outfitColor: 0x2e7d32,
+        secondaryColor: 0xffca28,
+        style: 'kurta',
+        hasBalloon: true,
         balloonColor: 0xffab00,
-        greetingText: 'Happy Diwali! रिंग टॉस खेलकर मैंने ट्रॉफी जीती!',
-        voiceLine: 'Happy Diwali! Try the ring toss game, it is super fun!',
+        greetingText: 'Happy Diwali! आओ हम भी बड़े झूले में बैठकर आसमान छूते हैं!',
+        voiceLine: 'Happy Diwali! Come join the queue for the Giant Ferris Wheel!',
+      },
+      // Crowd admiring & waving at Ghode Wala Jhoola (Royal Carousel at x: -28, z: -16)
+      {
+        name: 'Shalini Aunty',
+        x: -21.2,
+        z: -13.4,
+        yaw: -Math.PI * 0.62,
+        outfitColor: 0xc2185b,
+        secondaryColor: 0xffd54f,
+        style: 'saree',
+        greetingText: 'Happy Diwali! देखो बच्चे शाही घोड़े वाले झूले पर कितना आनंद ले रहे हैं!',
+        voiceLine: 'Happy Diwali! Look how happy the kids are riding the Royal Carousel horses!',
+      },
+      {
+        name: 'Manोज Ji',
+        x: -21.5,
+        z: -18.2,
+        yaw: -Math.PI * 0.42,
+        outfitColor: 0xe65100,
+        secondaryColor: 0xfff59d,
+        style: 'kurta',
+        hasTurban: true,
+        hasSparkler: true,
+        greetingText: 'शुभ दीपावली! घोड़े वाले झूले की रोशनी और संगीत बचपन की याद दिलाता है!',
+        voiceLine: 'Shubh Deepavali! The music and lights of the Carousel bring back childhood memories!',
+      },
+      // Crowd cheering at Mayur Samundari Jhoola (Peacock Pirate Ship at x: -28, z: -36)
+      {
+        name: 'Gaurav',
+        x: -21.5,
+        z: -33.2,
+        yaw: -Math.PI * 0.65,
+        outfitColor: 0x00695c,
+        secondaryColor: 0xffca28,
+        style: 'kurta',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali! बाप रे! मयूर समुद्री झूला कितना ऊँचा जा रहा है!',
+        voiceLine: 'Happy Diwali! Look how high that Peacock Pirate Ship swings into the night sky!',
+      },
+      {
+        name: 'Preeti',
+        x: -21.8,
+        z: -38.4,
+        yaw: -Math.PI * 0.35,
+        outfitColor: 0xad1457,
+        secondaryColor: 0xffe082,
+        style: 'saree',
+        hasBalloon: true,
+        balloonColor: 0x00e676,
+        greetingText: 'शुभ दीपावली! नाव वाले झूले में बैठे लोग हाथ उठाकर शोर मचा रहे हैं!',
+        voiceLine: 'Shubh Deepavali! Everyone on the swinging Peacock Ship is cheering with excitement!',
+      },
+      // Crowd outside Maut Ka Kuan (Well of Death at x: 28, z: -48)
+      {
+        name: 'Sardar Harpreet Ji',
+        x: 19.8,
+        z: -43.2,
+        yaw: Math.PI * 0.72,
+        outfitColor: 0xd32f2f,
+        secondaryColor: 0xffca28,
+        style: 'kurta',
+        hasTurban: true,
+        greetingText: 'सत श्री अकाल और शुभ दीपावली! मौत के कुएँ में बाइक राइडर्स कमाल कर रहे हैं!',
+        voiceLine: 'Happy Diwali! The motorcycle daredevils inside Maut Ka Kuan are unbelievable!',
+      },
+      {
+        name: 'Tarun',
+        x: 20.4,
+        z: -46.8,
+        yaw: Math.PI * 0.55,
+        outfitColor: 0x1976d2,
+        secondaryColor: 0xffe082,
+        style: 'kurta',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali! ऊपर गैलरी में खड़े होकर मौत का कुआँ देखने का मज़ा ही अलग है!',
+        voiceLine: 'Happy Diwali! Watching the stunt bikes from the top balcony gallery is thrilling!',
       },
       // Standing near 7 Diyas Mandap & Seva Daan Peti (x: 2.8, z: -6.2)
       {
@@ -4932,18 +5207,41 @@ export class MelaEngine {
         greetingText: 'Happy Diwali! आओ मिलकर आँगन में सुंदर रंगोली सजाएं!',
         voiceLine: 'Happy Diwali! Come fill the floor Rangoli with vibrant festive colors!',
       },
-      // Standing near Ram Leela Cultural Stage (x: -18.5, z: -44)
+      {
+        name: 'Pallavi',
+        x: -8.6,
+        z: -7.8,
+        yaw: Math.PI / 2,
+        outfitColor: 0xe64a19,
+        secondaryColor: 0xffe082,
+        style: 'saree',
+        greetingText: 'शुभ दीपावली! गुलाल के रंगों से अष्टदल कमल रंगोली कितनी सुंदर लग रही है!',
+        voiceLine: 'Shubh Deepavali! The lotus Rangoli looks so vibrant with fresh gulal colors!',
+      },
+      // Audience watching Ram Leela Cultural Stage (x: -24, z: -50)
       {
         name: 'Dada Ji',
         x: -18.5,
         z: -44.0,
-        yaw: Math.PI,
+        yaw: Math.PI + 0.45,
         outfitColor: 0x8d6e63,
         secondaryColor: 0xffe082,
         style: 'kurta',
         hasTurban: true,
         greetingText: 'जय श्री राम! शुभ दीपावली! अयोध्या में श्री राम के आगमन का उत्सव!',
         voiceLine: 'Jai Shri Ram! Shubh Deepavali! Rejoice in the grand return of Lord Rama!',
+      },
+      {
+        name: 'Dadi Maa',
+        x: -20.2,
+        z: -43.4,
+        yaw: Math.PI + 0.35,
+        outfitColor: 0xc2185b,
+        secondaryColor: 0xfff59d,
+        style: 'saree',
+        hasSparkler: true,
+        greetingText: 'शुभ दीपावली बेटा! राम लीला का राज्याभिषेक दृश्य बहुत पावन है!',
+        voiceLine: 'Happy Diwali beta! Watching the Ram Leela performance fills the heart with devotion!',
       },
       // Standing at the stairs of Shri Laxmi-Ganesh Maha-Mandir (x: -3.5, z: -25.2)
       {
@@ -5002,6 +5300,585 @@ export class MelaEngine {
         phase: i * 1.3,
         waveTimer: 0,
       });
+    }
+
+    // 2B. ACTIVE GAME PLAYERS AT BALLOON SHOOT (-24, 8) & GOLDEN RING TOSS (24, 8)
+    const activeGamePlayers: {
+      name: string;
+      x: number;
+      z: number;
+      yaw: number;
+      role: 'playing-balloon' | 'playing-ring';
+      outfitColor: number;
+      secondaryColor: number;
+      style: 'kurta' | 'saree' | 'child';
+      hasTurban?: boolean;
+      hasRifle?: boolean;
+      hasTossRing?: boolean;
+      greetingText: string;
+      voiceLine: string;
+    }[] = [
+      // Actively aiming & shooting balloons at Nishana Lagao (-24, 8, facing West toward -24)
+      {
+        name: 'Siddharth (Shooter)',
+        x: -20.8,
+        z: 7.35,
+        yaw: -Math.PI / 2,
+        role: 'playing-balloon',
+        outfitColor: 0x1e88e5,
+        secondaryColor: 0xffd54f,
+        style: 'kurta',
+        hasRifle: true,
+        greetingText: 'Happy Diwali! देखो मेरा निशाना—अभी लाल गुब्बारा फोड़ता हूँ! 🎯',
+        voiceLine: 'Happy Diwali! Watch my aim at the Balloon Shooting stall—bullseye every time!',
+      },
+      {
+        name: 'Aryan (Shooter)',
+        x: -20.8,
+        z: 8.65,
+        yaw: -Math.PI / 2,
+        role: 'playing-balloon',
+        outfitColor: 0xd81b60,
+        secondaryColor: 0xffe082,
+        style: 'child',
+        hasRifle: true,
+        greetingText: 'Happy Diwali! गुब्बारे फोड़ने में बहुत मज़ा आ रहा है! 🎈',
+        voiceLine: 'Happy Diwali! Playing the balloon shooting game at the mela is super exciting!',
+      },
+      // Actively tossing golden rings at Swarna Challa (24, 8, facing East toward 24)
+      {
+        name: 'Ananya (Ring Toss)',
+        x: 20.8,
+        z: 7.35,
+        yaw: Math.PI / 2,
+        role: 'playing-ring',
+        outfitColor: 0xc2185b,
+        secondaryColor: 0xffca28,
+        style: 'saree',
+        hasTossRing: true,
+        greetingText: 'Happy Diwali! यह सुनहरा छल्ला सीधा दिवाली ट्रॉफी पर गिरेगा! 🪙',
+        voiceLine: 'Happy Diwali! Watch me land this golden ring right on the center prize!',
+      },
+      {
+        name: 'Harsh (Ring Toss)',
+        x: 20.8,
+        z: 8.65,
+        yaw: Math.PI / 2,
+        role: 'playing-ring',
+        outfitColor: 0x00897b,
+        secondaryColor: 0xffe082,
+        style: 'kurta',
+        hasTurban: true,
+        hasTossRing: true,
+        greetingText: 'शुभ दीपावली! छल्ला फेंकने का खेल तो मेले की जान है!',
+        voiceLine: 'Shubh Deepavali! Golden Ring Toss is my favorite game in the entire Diwali Mela!',
+      },
+    ];
+
+    for (let i = 0; i < activeGamePlayers.length; i++) {
+      const p = activeGamePlayers[i];
+      const char = this.createVisitorCharacterMesh({
+        outfitColor: p.outfitColor,
+        secondaryColor: p.secondaryColor,
+        style: p.style,
+        hasTurban: p.hasTurban,
+        hasRifle: p.hasRifle,
+        hasTossRing: p.hasTossRing,
+        name: p.name,
+        greetingText: p.greetingText,
+      });
+      char.group.position.set(p.x, 0, p.z);
+      char.group.rotation.y = p.yaw;
+      this.dynamicRoot.add(char.group);
+
+      this.crowdVisitors.push({
+        ...char,
+        role: p.role,
+        name: p.name,
+        greetingText: p.greetingText,
+        voiceLine: p.voiceLine,
+        walkSpeed: 0,
+        waypoints: [],
+        currentWaypoint: 0,
+        baseYaw: p.yaw,
+        phase: i * 1.45,
+        waveTimer: 0,
+      });
+    }
+
+    // 2C. PASSENGERS ALREADY RIDING ALL JHOOLAS & SPECTATORS ON WELL OF DEATH BALCONY
+    // (1) 8 Passengers riding inside the 8 Chand Wala Jhoola (Giant Ferris Wheel) Gondolas
+    const ferrisRiderSpecs: {
+      name: string;
+      outfitColor: number;
+      secondaryColor: number;
+      style: 'kurta' | 'saree' | 'child';
+      hasTurban?: boolean;
+      hasSparkler?: boolean;
+      greetingText: string;
+      voiceLine: string;
+    }[] = [
+      {
+        name: 'Rahul (On Giant Wheel)',
+        outfitColor: 0xe53935,
+        secondaryColor: 0xffd54f,
+        style: 'kurta',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali from the sky! ऊपर से पूरा मेला तारों जैसा चमक रहा है! 🎡',
+        voiceLine: 'Happy Diwali from the top of the Giant Ferris Wheel! The entire mela glows like stars!',
+      },
+      {
+        name: 'Sneha (On Giant Wheel)',
+        outfitColor: 0xd81b60,
+        secondaryColor: 0xffe082,
+        style: 'saree',
+        greetingText: 'शुभ दीपावली! चाँद वाले झूले पर बैठकर हवा में उड़ने जैसा लग रहा है!',
+        voiceLine: 'Shubh Deepavali! Riding the Chand Wala Jhoola under the sky lanterns is magical!',
+      },
+      {
+        name: 'Vihaan (On Giant Wheel)',
+        outfitColor: 0x039be5,
+        secondaryColor: 0xfff176,
+        style: 'child',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali! देखो मैं आकाशदीप के बिलकुल पास आ गया! ✨',
+        voiceLine: 'Happy Diwali! I am high up in the Ferris Wheel right next to the floating sky lanterns!',
+      },
+      {
+        name: 'Pankaj Ji (On Giant Wheel)',
+        outfitColor: 0x6a1b9a,
+        secondaryColor: 0xffca28,
+        style: 'kurta',
+        hasTurban: true,
+        greetingText: 'शुभ दीपावली! यहाँ ऊपर से श्री लक्ष्मी-गणेश मंदिर का शिखर अद्भुत दिख रहा है!',
+        voiceLine: 'Shubh Deepavali! The golden temple spire looks breathtaking from the Giant Wheel!',
+      },
+      {
+        name: 'Kritika (On Giant Wheel)',
+        outfitColor: 0xf4511e,
+        secondaryColor: 0xffe082,
+        style: 'saree',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali! मेले का सबसे शानदार झूला यही है! 🎡',
+        voiceLine: 'Happy Diwali! Come take a spin on the Giant Ferris Wheel!',
+      },
+      {
+        name: 'Yash (On Giant Wheel)',
+        outfitColor: 0x00897b,
+        secondaryColor: 0xffd54f,
+        style: 'kurta',
+        greetingText: 'Happy Diwali Dost! नीचे से हाथ हिलाओ, मैं ऊपर से देख रहा हूँ!',
+        voiceLine: 'Happy Diwali my friend! Wave to us from down there!',
+      },
+      {
+        name: 'Mitali (On Giant Wheel)',
+        outfitColor: 0x8e24aa,
+        secondaryColor: 0xfff59d,
+        style: 'saree',
+        greetingText: 'शुभ दीपावली! दीयों और आतिशबाज़ी का नज़ारा ऊपर से लाजवाब है!',
+        voiceLine: 'Shubh Deepavali! Watching the fireworks from the Ferris Wheel is unforgettable!',
+      },
+      {
+        name: 'Tinku (On Giant Wheel)',
+        outfitColor: 0xfb8c00,
+        secondaryColor: 0xffe082,
+        style: 'child',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali! यह झूला तो चाँद तक जाता है! 🌙',
+        voiceLine: 'Happy Diwali! This Chand Wala Jhoola goes all the way to the moon!',
+      },
+    ];
+
+    for (let i = 0; i < Math.min(this.ferrisGondolas.length, ferrisRiderSpecs.length); i++) {
+      const gondola = this.ferrisGondolas[i];
+      const rSpec = ferrisRiderSpecs[i];
+      const char = this.createVisitorCharacterMesh({
+        outfitColor: rSpec.outfitColor,
+        secondaryColor: rSpec.secondaryColor,
+        style: rSpec.style,
+        hasTurban: rSpec.hasTurban,
+        hasSparkler: rSpec.hasSparkler,
+        onRide: true,
+        name: rSpec.name,
+        greetingText: rSpec.greetingText,
+      });
+      // Position inside the gondola basket so upper body & waving arms rise above the rim
+      char.group.position.set(0, -2.05, 0.12);
+      char.group.rotation.y = 0.35;
+      gondola.add(char.group);
+
+      this.crowdVisitors.push({
+        ...char,
+        role: 'riding-wheel',
+        name: rSpec.name,
+        greetingText: rSpec.greetingText,
+        voiceLine: rSpec.voiceLine,
+        walkSpeed: 0,
+        waypoints: [],
+        currentWaypoint: 0,
+        baseYaw: 0.35,
+        phase: i * 0.9,
+        waveTimer: 0,
+      });
+    }
+
+    // (2) 6 Riders mounted on the bobbing Ghode Wala Jhoola (Royal Carousel) Horses
+    const carouselRiderSpecs: {
+      horseIdx: number;
+      name: string;
+      outfitColor: number;
+      secondaryColor: number;
+      style: 'kurta' | 'saree' | 'child';
+      hasBalloon?: boolean;
+      balloonColor?: number;
+      hasSparkler?: boolean;
+      greetingText: string;
+      voiceLine: string;
+    }[] = [
+      {
+        horseIdx: 1,
+        name: 'Munni (On Carousel)',
+        outfitColor: 0xd81b60,
+        secondaryColor: 0xffe082,
+        style: 'child',
+        hasBalloon: true,
+        balloonColor: 0xff4081,
+        greetingText: 'Happy Diwali! देखो मैं शाही घोड़े पर सवारी कर रही हूँ! 🎠',
+        voiceLine: 'Happy Diwali! Look at me riding the golden carousel horse!',
+      },
+      {
+        horseIdx: 2,
+        name: 'Ishaan (On Carousel)',
+        outfitColor: 0x1e88e5,
+        secondaryColor: 0xffd54f,
+        style: 'child',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali! घोड़े वाला झूला गोल-गोल घूम रहा है! ✨',
+        voiceLine: 'Happy Diwali! The Royal Carousel is spinning round and round!',
+      },
+      {
+        horseIdx: 3,
+        name: 'Nisha (On Carousel)',
+        outfitColor: 0x8e24aa,
+        secondaryColor: 0xffca28,
+        style: 'saree',
+        greetingText: 'शुभ दीपावली! बचपन की यादें ताज़ा हो गईं इस झूले पर बैठकर!',
+        voiceLine: 'Shubh Deepavali! Riding the carousel brings back the sweetest childhood memories!',
+      },
+      {
+        horseIdx: 5,
+        name: 'Lucky (On Carousel)',
+        outfitColor: 0x43a047,
+        secondaryColor: 0xfff176,
+        style: 'child',
+        hasBalloon: true,
+        balloonColor: 0x00e5ff,
+        greetingText: 'Happy Diwali! मेरा घोड़ा सबसे तेज़ दौड़ रहा है! 🐎',
+        voiceLine: 'Happy Diwali! My carousel horse is galloping the fastest!',
+      },
+      {
+        horseIdx: 6,
+        name: 'Aditi (On Carousel)',
+        outfitColor: 0xe64a19,
+        secondaryColor: 0xffe082,
+        style: 'saree',
+        hasSparkler: true,
+        greetingText: 'Happy Diwali! आओ आप भी घोड़े वाले झूले पर एक चक्कर लगाओ!',
+        voiceLine: 'Happy Diwali! Hop on a horse and take a spin on the Royal Carousel!',
+      },
+      {
+        horseIdx: 7,
+        name: 'Raju (On Carousel)',
+        outfitColor: 0xfb8c00,
+        secondaryColor: 0xfff59d,
+        style: 'child',
+        greetingText: 'शुभ दीपावली! मेले के झूले सबसे मज़ेदार हैं! 🎠',
+        voiceLine: 'Shubh Deepavali! The Diwali Mela rides are the best in the world!',
+      },
+    ];
+
+    for (let i = 0; i < carouselRiderSpecs.length; i++) {
+      const cSpec = carouselRiderSpecs[i];
+      const horse = this.carouselHorses[cSpec.horseIdx];
+      if (!horse) continue;
+
+      const char = this.createVisitorCharacterMesh({
+        outfitColor: cSpec.outfitColor,
+        secondaryColor: cSpec.secondaryColor,
+        style: cSpec.style,
+        hasBalloon: cSpec.hasBalloon,
+        balloonColor: cSpec.balloonColor,
+        hasSparkler: cSpec.hasSparkler,
+        sitting: true,
+        onRide: true,
+        name: cSpec.name,
+        greetingText: cSpec.greetingText,
+      });
+      // Sit astride the horse saddle facing +Z (direction of the horse's neck)
+      char.group.position.set(0, -0.1, -0.04);
+      char.group.rotation.y = 0;
+      char.leftLeg.rotation.z = -0.36;
+      char.rightLeg.rotation.z = 0.36;
+      horse.add(char.group);
+
+      this.crowdVisitors.push({
+        ...char,
+        role: 'riding-carousel',
+        name: cSpec.name,
+        greetingText: cSpec.greetingText,
+        voiceLine: cSpec.voiceLine,
+        walkSpeed: 0,
+        waypoints: [],
+        currentWaypoint: 0,
+        baseYaw: 0,
+        phase: i * 1.2,
+        waveTimer: 0,
+      });
+    }
+
+    // (3) 6 Thrilled Passengers seated inside the swinging Mayur Samundari Jhoola (Peacock Ship)
+    if (this.pirateShipHull) {
+      const shipRiderSpecs: {
+        x: number;
+        z: number;
+        yaw: number;
+        name: string;
+        outfitColor: number;
+        secondaryColor: number;
+        style: 'kurta' | 'saree' | 'child';
+        hasTurban?: boolean;
+        greetingText: string;
+        voiceLine: string;
+      }[] = [
+        {
+          x: -0.52,
+          z: -1.75,
+          yaw: 0,
+          name: 'Varun (On Peacock Ship)',
+          outfitColor: 0xd32f2f,
+          secondaryColor: 0xffd54f,
+          style: 'kurta',
+          hasTurban: true,
+          greetingText: 'Happy Diwali! वूहू! मयूर कश्ती आसमान छू रही है! ⛵',
+          voiceLine: 'Woohoo! Happy Diwali! The Peacock Pirate Ship is swinging so high!',
+        },
+        {
+          x: 0.52,
+          z: -1.75,
+          yaw: 0,
+          name: 'Megha (On Peacock Ship)',
+          outfitColor: 0xc2185b,
+          secondaryColor: 0xffe082,
+          style: 'saree',
+          greetingText: 'शुभ दीपावली! पेट में गुदगुदी हो रही है इस समुद्री झूले में!',
+          voiceLine: 'Shubh Deepavali! What a thrilling ride on the Mayur Samundari Jhoola!',
+        },
+        {
+          x: -0.52,
+          z: 0,
+          yaw: 0,
+          name: 'Kunal (On Peacock Ship)',
+          outfitColor: 0x1976d2,
+          secondaryColor: 0xffca28,
+          style: 'kurta',
+          greetingText: 'Happy Diwali! दोनों हाथ ऊपर करके झूला झूलने का मज़ा ही कुछ और है!',
+          voiceLine: 'Happy Diwali! Put your hands up in the air on the swinging ship!',
+        },
+        {
+          x: 0.52,
+          z: 0,
+          yaw: 0,
+          name: 'Payal (On Peacock Ship)',
+          outfitColor: 0x7b1fa2,
+          secondaryColor: 0xfff176,
+          style: 'saree',
+          greetingText: 'Happy Diwali! यह झूला तो हवा से बातें कर रहा है! ✨',
+          voiceLine: 'Happy Diwali! This Peacock Ship ride feels like flying through the night sky!',
+        },
+        {
+          x: -0.52,
+          z: 1.75,
+          yaw: Math.PI,
+          name: 'Sोनू (On Peacock Ship)',
+          outfitColor: 0x00897b,
+          secondaryColor: 0xffd54f,
+          style: 'child',
+          greetingText: 'Happy Diwali! एक और तेज़ झोंका आने वाला है! ⛵',
+          voiceLine: 'Happy Diwali! Here comes another giant swing!',
+        },
+        {
+          x: 0.52,
+          z: 1.75,
+          yaw: Math.PI,
+          name: 'Monu (On Peacock Ship)',
+          outfitColor: 0xf57c00,
+          secondaryColor: 0xffe082,
+          style: 'child',
+          greetingText: 'शुभ दीपावली! मयूर झूला सबसे रोमांचक है!',
+          voiceLine: 'Shubh Deepavali! The Peacock Ship is the most thrilling ride in the mela!',
+        },
+      ];
+
+      for (let i = 0; i < shipRiderSpecs.length; i++) {
+        const sSpec = shipRiderSpecs[i];
+        const char = this.createVisitorCharacterMesh({
+          outfitColor: sSpec.outfitColor,
+          secondaryColor: sSpec.secondaryColor,
+          style: sSpec.style,
+          hasTurban: sSpec.hasTurban,
+          sitting: true,
+          onRide: true,
+          name: sSpec.name,
+          greetingText: sSpec.greetingText,
+        });
+        char.group.position.set(sSpec.x, 0.16, sSpec.z);
+        char.group.rotation.y = sSpec.yaw;
+        this.pirateShipHull.add(char.group);
+
+        this.crowdVisitors.push({
+          ...char,
+          role: 'riding-ship',
+          name: sSpec.name,
+          greetingText: sSpec.greetingText,
+          voiceLine: sSpec.voiceLine,
+          walkSpeed: 0,
+          waypoints: [],
+          currentWaypoint: 0,
+          baseYaw: sSpec.yaw,
+          phase: i * 0.85,
+          waveTimer: 0,
+        });
+      }
+    }
+
+    // (4) 8 Excited Spectators on the Top Balcony Gallery of Maut Ka Kuan (Well of Death, y = 7.0m)
+    if (this.wellRoot) {
+      const wellGallerySpecs: {
+        angle: number;
+        name: string;
+        outfitColor: number;
+        secondaryColor: number;
+        style: 'kurta' | 'saree' | 'child';
+        hasTurban?: boolean;
+        hasSparkler?: boolean;
+        greetingText: string;
+        voiceLine: string;
+      }[] = [
+        {
+          angle: 0.3,
+          name: 'Rakesh (Well Gallery)',
+          outfitColor: 0xc62828,
+          secondaryColor: 0xffd54f,
+          style: 'kurta',
+          hasTurban: true,
+          greetingText: 'Happy Diwali! अरे वाह! खड़ी दीवार पर दो-दो बाइक एक साथ दौड़ रही हैं! 🏍️',
+          voiceLine: 'Happy Diwali! Look down inside Maut Ka Kuan—two motorcycles racing on the vertical wall!',
+        },
+        {
+          angle: 1.05,
+          name: 'Sunil (Well Gallery)',
+          outfitColor: 0x1565c0,
+          secondaryColor: 0xffe082,
+          style: 'kurta',
+          hasSparkler: true,
+          greetingText: 'शुभ दीपावली! मौत के कुएँ के स्टंट देखकर रोंगटे खड़े हो गए!',
+          voiceLine: 'Shubh Deepavali! Watching these daredevil bike stunts from the top balcony is awesome!',
+        },
+        {
+          angle: 1.85,
+          name: 'Geeta (Well Gallery)',
+          outfitColor: 0xad1457,
+          secondaryColor: 0xffca28,
+          style: 'saree',
+          greetingText: 'Happy Diwali! बाइक की रफ़्तार से पूरा लकड़ी का कुआँ काँप रहा है!',
+          voiceLine: 'Happy Diwali! You can feel the whole wooden cylinder rumble as the bikes zoom past!',
+        },
+        {
+          angle: 2.65,
+          name: 'Jatin (Well Gallery)',
+          outfitColor: 0x2e7d32,
+          secondaryColor: 0xfff176,
+          style: 'kurta',
+          hasTurban: true,
+          greetingText: 'शुभ दीपावली! क्या गज़ब का संतुलन है इन स्टंट राइडर्स का!',
+          voiceLine: 'Shubh Deepavali! Salute to the fearless stunt riders of the Diwali Mela!',
+        },
+        {
+          angle: 3.45,
+          name: 'Rekha (Well Gallery)',
+          outfitColor: 0x6a1b9a,
+          secondaryColor: 0xffd54f,
+          style: 'saree',
+          hasSparkler: true,
+          greetingText: 'Happy Diwali! ऊपर बालकनी से पूरा कुआँ साफ़ दिखाई देता है!',
+          voiceLine: 'Happy Diwali! The view from the top gallery of the Well of Death is incredible!',
+        },
+        {
+          angle: 4.25,
+          name: 'Abhishek (Well Gallery)',
+          outfitColor: 0xef6c00,
+          secondaryColor: 0xffe082,
+          style: 'kurta',
+          greetingText: 'Happy Diwali Bhai! अगली बारी में मैं खुद बाइक चलाकर सुनहरे छल्ले पकड़ूँगा!',
+          voiceLine: 'Happy Diwali bro! Next round I am going to ride the wall myself and grab the golden rings!',
+        },
+        {
+          angle: 5.05,
+          name: 'Komal (Well Gallery)',
+          outfitColor: 0xd81b60,
+          secondaryColor: 0xfff59d,
+          style: 'saree',
+          greetingText: 'शुभ दीपावली! मेले में मौत का कुआँ देखे बिना जाना अधूरा है!',
+          voiceLine: 'Shubh Deepavali! Maut Ka Kuan is the biggest crowd puller at the fair!',
+        },
+        {
+          angle: 5.8,
+          name: 'Chintu (Well Gallery)',
+          outfitColor: 0x00838f,
+          secondaryColor: 0xffd54f,
+          style: 'child',
+          hasSparkler: true,
+          greetingText: 'Happy Diwali! देखो लाल और पीली बाइक कितनी तेज़ घूम रही हैं! 🏍️',
+          voiceLine: 'Happy Diwali! Look how fast the red and yellow stunt bikes are zooming!',
+        },
+      ];
+
+      const galleryR = 8.25;
+      for (let i = 0; i < wellGallerySpecs.length; i++) {
+        const wSpec = wellGallerySpecs[i];
+        const gx = Math.cos(wSpec.angle) * galleryR;
+        const gz = Math.sin(wSpec.angle) * galleryR;
+        // Face inward toward the center of the Well (0, 0)
+        const inwardYaw = Math.atan2(-gx, -gz);
+
+        const char = this.createVisitorCharacterMesh({
+          outfitColor: wSpec.outfitColor,
+          secondaryColor: wSpec.secondaryColor,
+          style: wSpec.style,
+          hasTurban: wSpec.hasTurban,
+          hasSparkler: wSpec.hasSparkler,
+          onRide: true,
+          name: wSpec.name,
+          greetingText: wSpec.greetingText,
+        });
+        char.group.position.set(gx, 7.0, gz);
+        char.group.rotation.y = inwardYaw;
+        this.wellRoot.add(char.group);
+
+        this.crowdVisitors.push({
+          ...char,
+          role: 'well-spectator',
+          name: wSpec.name,
+          greetingText: wSpec.greetingText,
+          voiceLine: wSpec.voiceLine,
+          walkSpeed: 0,
+          waypoints: [],
+          currentWaypoint: 0,
+          baseYaw: inwardYaw,
+          phase: i * 1.1,
+          waveTimer: 0,
+        });
+      }
     }
 
     // 3. ROAMING MELA CROWDS (12 Visitors strolling along the bazaar lanes & fairground)
@@ -5231,7 +6108,7 @@ export class MelaEngine {
 
     const groups = this.crowdVisitors.map((v) => v.group);
     const hits = this.raycaster.intersectObjects(groups, true);
-    if (hits.length > 0 && hits[0].distance < 28) {
+    if (hits.length > 0 && hits[0].distance < 42) {
       const hitObj = hits[0].object;
       const visitor = this.crowdVisitors.find((v) => {
         let curr: THREE.Object3D | null = hitObj;
@@ -5247,18 +6124,19 @@ export class MelaEngine {
         visitor.waveTimer = 4.5;
         visitor.greetingSprite.visible = true;
 
-        // If standing or roaming, turn warmly toward the player
-        if (visitor.role !== 'sitting') {
+        // If standing or roaming on ground, turn warmly toward the player
+        if (visitor.role === 'standing' || visitor.role === 'roaming') {
           const dx = this.camera.position.x - visitor.group.position.x;
           const dz = this.camera.position.z - visitor.group.position.z;
           visitor.group.rotation.y = Math.atan2(dx, dz);
         }
 
-        // Golden celebration spark burst above visitor
+        // Get true world position (works even for passengers high up on Ferris Wheel, Carousel, or Pirate Ship!)
+        visitor.group.getWorldPosition(_vec3);
         this.spawnFireworkBurst(
-          visitor.group.position.x,
-          visitor.group.position.y + 2.1,
-          visitor.group.position.z,
+          _vec3.x,
+          _vec3.y + 2.1,
+          _vec3.z,
           28,
           0xffd269
         );
@@ -5274,6 +6152,42 @@ export class MelaEngine {
 
   private updateCrowdAnimations(dt: number): void {
     const t = this.elapsed;
+
+    // Ambient NPC Balloon Shoot spark bursts & NPC Ring Toss flight when player is walking around
+    if (this.mode !== 'balloon') {
+      this.npcBalloonSparkTimer += dt;
+      if (this.npcBalloonSparkTimer > 2.6) {
+        this.npcBalloonSparkTimer = 0;
+        const randomRow = Math.floor(Math.random() * 3);
+        const randomCol = Math.floor(Math.random() * 3) - 1;
+        this.spawnFireworkBurst(
+          -24.2,
+          1.55 + randomRow * 0.48,
+          8.0 + randomCol * 0.95,
+          18,
+          0xff4d6d
+        );
+      }
+    }
+
+    if (this.npcRingMesh) {
+      if (this.mode === 'ring') {
+        this.npcRingMesh.visible = false;
+      } else {
+        this.npcRingMesh.visible = true;
+        const cycle = (t * 0.65) % 1;
+        const startX = 20.9;
+        const endX = 23.65;
+        const startZ = 7.35;
+        const endZ = 8.0 + Math.sin(Math.floor(t * 0.65) * 2.1) * 0.85;
+        this.npcRingMesh.position.set(
+          THREE.MathUtils.lerp(startX, endX, cycle),
+          1.25 + Math.sin(cycle * Math.PI) * 1.15,
+          THREE.MathUtils.lerp(startZ, endZ, cycle)
+        );
+        this.npcRingMesh.rotation.z = cycle * Math.PI * 2;
+      }
+    }
 
     for (let i = 0; i < this.crowdVisitors.length; i++) {
       const v = this.crowdVisitors[i];
@@ -5347,6 +6261,46 @@ export class MelaEngine {
           v.head.rotation.x = 0;
         }
         v.head.rotation.y = Math.sin(t * 1.5 + v.phase) * 0.22;
+      } else if (v.role === 'riding-wheel') {
+        // Passengers inside Ferris Wheel gondolas looking out over the Mela and waving happily
+        v.head.rotation.y = Math.sin(t * 1.6 + v.phase) * 0.38;
+        v.rightArm.rotation.x = -2.15 + Math.sin(t * 5.2 + v.phase) * 0.32;
+        v.rightArm.rotation.z = -0.22 + Math.cos(t * 5.2 + v.phase) * 0.22;
+        v.leftArm.rotation.x = -0.45 + Math.sin(t * 2.5 + v.phase) * 0.15;
+      } else if (v.role === 'riding-carousel') {
+        // Riders mounted on Carousel horses holding the brass pole & waving
+        v.leftArm.rotation.x = -1.15;
+        v.rightArm.rotation.x = -1.95 + Math.sin(t * 5.8 + v.phase) * 0.35;
+        v.rightArm.rotation.z = -0.2 + Math.cos(t * 5.8 + v.phase) * 0.2;
+        v.head.rotation.y = Math.sin(t * 2.0 + v.phase) * 0.25;
+      } else if (v.role === 'riding-ship') {
+        // Thrilled passengers on the swinging Peacock Pirate Ship throwing both hands up on high swings!
+        const thrill = Math.abs(Math.sin(t * 1.45));
+        v.leftArm.rotation.x = -1.1 - thrill * 1.35;
+        v.rightArm.rotation.x = -1.1 - thrill * 1.35;
+        v.leftArm.rotation.z = 0.22 + Math.sin(t * 8 + v.phase) * 0.12;
+        v.rightArm.rotation.z = -0.22 - Math.sin(t * 8 + v.phase) * 0.12;
+        v.head.rotation.x = -thrill * 0.22;
+      } else if (v.role === 'well-spectator') {
+        // Excited spectators on top of Maut Ka Kuan peering down & cheering the stunt bikes
+        v.head.rotation.x = 0.42;
+        v.head.rotation.y = Math.sin(t * 3.2 + v.phase) * 0.35;
+        v.rightArm.rotation.x = -1.85 + Math.sin(t * 6.5 + v.phase) * 0.45;
+        v.leftArm.rotation.x = -0.8 + Math.cos(t * 4.5 + v.phase) * 0.25;
+      } else if (v.role === 'playing-balloon') {
+        // Aiming 3D toy air-rifle at the balloon board with periodic shot recoil
+        const shotCycle = (t * 1.15 + v.phase) % 2.6;
+        const recoil = shotCycle < 0.22 ? Math.sin((shotCycle / 0.22) * Math.PI) * 0.22 : 0;
+        v.rightArm.rotation.x = -1.42 - recoil;
+        v.leftArm.rotation.x = -1.32 - recoil * 0.8;
+        v.leftArm.rotation.y = 0.25;
+        v.head.rotation.y = Math.sin(t * 0.9 + v.phase) * 0.08;
+      } else if (v.role === 'playing-ring') {
+        // Winding up and tossing golden rings toward the pegs
+        const throwWave = Math.sin(t * 2.8 + v.phase);
+        v.rightArm.rotation.x = -0.85 - Math.max(0, throwWave) * 1.1;
+        v.bodyGroup.position.y = Math.max(0, throwWave) * 0.04;
+        v.head.rotation.y = Math.sin(t * 1.2 + v.phase) * 0.12;
       } else if (v.role === 'standing') {
         // Shoppers admiring stalls, pointing at items, and chatting
         const gesture = Math.sin(t * 2.4 + v.phase);
