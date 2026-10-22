@@ -29,10 +29,11 @@ export type MelaMode =
   | 'well'
   | 'stage'
   | 'firework-show'
+  | 'temple-aarti'
   | 'finale';
 
 export interface GameHudState {
-  mode: 'balloon' | 'ring' | 'diya-game' | 'rangoli' | 'well';
+  mode: 'balloon' | 'ring' | 'diya-game' | 'rangoli' | 'well' | 'temple-aarti';
   shotsLeft: number;
   score: number;
   totalTargets?: number;
@@ -215,6 +216,19 @@ export class MelaEngine {
   private mandapAartiThali: THREE.Group | null = null;
   private mandapAartiBasePos = new THREE.Vector3(0, 1.08, 3.95);
   private mandapAartiTimer = 0;
+
+  // Grand Shri Laxmi-Ganesh Maha-Mandir (Temple, Colossal Idols & Interactive Aarti Thali)
+  private templeGroup: THREE.Group | null = null;
+  private templeBellPivot: THREE.Group | null = null;
+  private templeBellTimer = 0;
+  private templeAartiThali: THREE.Group | null = null;
+  private templeAartiBasePos = new THREE.Vector3(0, 2.16, 2.85);
+  private templeAartiTimer = 0;
+  private templeAartiAngle = 0;
+  private templeAartiCircles = 0;
+  private templeHalos: THREE.Object3D[] = [];
+  private templeFlagMesh: THREE.Object3D | null = null;
+  private templePrasadGroup: THREE.Group | null = null;
 
   // Interactive 3D Ground Crackers (Anaar, Chakri, Sky Rocket)
   private groundCrackers: {
@@ -446,7 +460,8 @@ export class MelaEngine {
       { x: 0, z: 38, size: 7.5, tex: rangoliTex1 },
       { x: 0, z: 22, size: 6.5, tex: rangoliTex2 },
       { x: 0, z: -10, size: 9.5, tex: rangoliTex1 },
-      { x: 0, z: -56, size: 11.0, tex: rangoliTex2 },
+      { x: 0, z: -24.5, size: 8.5, tex: rangoliTex2 },
+      { x: 0, z: -62, size: 11.0, tex: rangoliTex2 },
     ];
     for (const r of rangoliPositions) {
       const rMat = new THREE.MeshStandardMaterial({
@@ -652,6 +667,12 @@ export class MelaEngine {
     this.crowdVisitors = [];
     this.mandapBellPivot = null;
     this.mandapAartiThali = null;
+    this.templeGroup = null;
+    this.templeBellPivot = null;
+    this.templeAartiThali = null;
+    this.templeHalos = [];
+    this.templeFlagMesh = null;
+    this.templePrasadGroup = null;
     this.groundCrackers = [];
     this.wishLanterns = [];
 
@@ -700,6 +721,9 @@ export class MelaEngine {
           break;
         case 'fireworks':
           this.buildFireworksPavilion(spec);
+          break;
+        case 'temple':
+          this.buildLaxmiGaneshTemple(spec);
           break;
         case 'finale':
           this.buildGrandAkashdeepTower(spec);
@@ -1895,6 +1919,817 @@ export class MelaEngine {
     this.dynamicRoot.add(group);
   }
 
+  private buildLaxmiGaneshTemple(spec: MelaInteractableSpec): void {
+    const temple = new THREE.Group();
+    temple.position.set(spec.x, 0, spec.z);
+    temple.rotation.y = spec.rotY;
+    temple.userData.spec = spec;
+    this.templeGroup = temple;
+
+    // Rich Temple Materials
+    const sandstoneMat = new THREE.MeshStandardMaterial({ color: 0x8f2424, roughness: 0.62, metalness: 0.14 });
+    const marbleMat = new THREE.MeshStandardMaterial({ color: 0xfff5e4, roughness: 0.36, metalness: 0.12 });
+    const darkMarbleMat = new THREE.MeshStandardMaterial({ color: 0x3b1520, roughness: 0.5, metalness: 0.18 });
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xf6be4f, roughness: 0.22, metalness: 0.88 });
+    const brightGoldMat = new THREE.MeshStandardMaterial({
+      color: 0xffd768,
+      emissive: 0x6b4400,
+      emissiveIntensity: 0.35,
+      roughness: 0.18,
+      metalness: 0.92,
+    });
+    const crimsonVelvetMat = new THREE.MeshStandardMaterial({ color: 0xa8132b, roughness: 0.68, metalness: 0.08 });
+    const lotusPinkMat = new THREE.MeshStandardMaterial({
+      color: 0xff3b8b,
+      emissive: 0x4a0822,
+      emissiveIntensity: 0.25,
+      roughness: 0.38,
+      metalness: 0.12,
+    });
+    const marigoldOrangeMat = new THREE.MeshStandardMaterial({ color: 0xff8500, roughness: 0.65 });
+    const marigoldYellowMat = new THREE.MeshStandardMaterial({ color: 0xffcf00, roughness: 0.65 });
+
+    // 1. GRAND 3-TIER STEPPED JAGATI PLINTH (15.4m wide x 14.4m deep)
+    const tier1 = new THREE.Mesh(new THREE.BoxGeometry(15.4, 0.42, 14.4), sandstoneMat);
+    tier1.position.set(0, 0.21, 0);
+    tier1.receiveShadow = true;
+    const tier2 = new THREE.Mesh(new THREE.BoxGeometry(13.8, 0.44, 12.8), marbleMat);
+    tier2.position.set(0, 0.64, 0);
+    tier2.receiveShadow = true;
+    const tier3 = new THREE.Mesh(new THREE.BoxGeometry(12.4, 0.44, 11.4), sandstoneMat);
+    tier3.position.set(0, 1.08, 0);
+    tier3.receiveShadow = true;
+    const goldPlinthTrim = new THREE.Mesh(new THREE.BoxGeometry(12.56, 0.1, 11.56), goldMat);
+    goldPlinthTrim.position.set(0, 1.28, 0);
+    temple.add(tier1, tier2, tier3, goldPlinthTrim);
+
+    // Royal Red Velvet Darshan Carpet from Stairs to Sanctum
+    const carpet = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.04, 10.8), crimsonVelvetMat);
+    carpet.position.set(0, 1.31, 0.6);
+    temple.add(carpet);
+
+    // 2. CEREMONIAL FRONT STAIRCASE (SOPANA) & TWIN TEMPLE ELEPHANTS (GAJA-DWARAPALA)
+    for (let s = 0; s < 5; s++) {
+      const stepW = 5.4 - s * 0.15;
+      const stepY = 0.13 + s * 0.25;
+      const stepZ = 7.8 - s * 0.48;
+      const stepMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(stepW, 0.25, 0.56),
+        s % 2 === 0 ? marbleMat : goldMat
+      );
+      stepMesh.position.set(0, stepY, stepZ);
+      temple.add(stepMesh);
+    }
+
+    // Stepped Golden Balustrades & 10 Glowing Clay Diyas lining the Temple Steps
+    for (const side of [-1, 1]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.9, 2.8), goldMat);
+      rail.position.set(side * 2.85, 0.72, 6.8);
+      rail.rotation.x = 0.42;
+      temple.add(rail);
+
+      for (let d = 0; d < 4; d++) {
+        const { group: stepDiya } = this.createClayDiyaMesh(0.82, true);
+        stepDiya.position.set(side * 2.85, 0.35 + d * 0.28, 7.75 - d * 0.55);
+        temple.add(stepDiya);
+      }
+
+      // Twin White & Gold Royal Temple Elephants welcoming devotees at the base of the stairs
+      const elephant = new THREE.Group();
+      elephant.position.set(side * 4.15, 0.42, 6.95);
+      elephant.rotation.y = side * -0.25;
+      const ePedestal = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.45, 1.9), goldMat);
+      ePedestal.position.y = 0.22;
+      const eBody = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.95, 1.35), marbleMat);
+      eBody.position.set(0, 0.98, 0);
+      const eSaddle = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.45, 0.85), crimsonVelvetMat);
+      eSaddle.position.set(0, 1.28, 0);
+      const eHead = new THREE.Mesh(new THREE.SphereGeometry(0.46, 14, 14), marbleMat);
+      eHead.position.set(0, 1.35, 0.72);
+      const eTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.16, 0.75, 10), marbleMat);
+      eTrunk.position.set(0, 1.62, 1.08);
+      eTrunk.rotation.x = -0.55;
+      const eKalash = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 10), brightGoldMat);
+      eKalash.position.set(0, 1.95, 1.24);
+      for (const legX of [-0.35, 0.35]) {
+        for (const legZ of [-0.42, 0.42]) {
+          const eLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.15, 0.65, 10), marbleMat);
+          eLeg.position.set(legX, 0.55, legZ);
+          elephant.add(eLeg);
+        }
+      }
+      elephant.add(ePedestal, eBody, eSaddle, eHead, eTrunk, eKalash);
+      temple.add(elephant);
+    }
+
+    // 3. 10 CARVED MARBLE & GOLD MANDAP PILLARS (6.4m Tall)
+    const pillarCoords = [
+      [-5.3, 4.8],
+      [-2.7, 4.8],
+      [2.7, 4.8],
+      [5.3, 4.8],
+      [-5.3, 0.8],
+      [5.3, 0.8],
+      [-5.3, -4.4],
+      [-2.7, -4.4],
+      [2.7, -4.4],
+      [5.3, -4.4],
+    ];
+    for (const [px, pz] of pillarCoords) {
+      const pGroup = new THREE.Group();
+      pGroup.position.set(px, 1.3, pz);
+
+      const pBase = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.65, 0.95), goldMat);
+      pBase.position.y = 0.32;
+      const pShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.38, 5.2, 16), marbleMat);
+      pShaft.position.y = 3.1;
+      const pBand1 = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.06, 10, 18), goldMat);
+      pBand1.rotation.x = Math.PI / 2;
+      pBand1.position.y = 1.9;
+      const pBand2 = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.06, 10, 18), goldMat);
+      pBand2.rotation.x = Math.PI / 2;
+      pBand2.position.y = 3.8;
+      const pCapital = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.34, 0.55, 16), goldMat);
+      pCapital.position.y = 5.85;
+
+      pGroup.add(pBase, pShaft, pBand1, pBand2, pCapital);
+      temple.add(pGroup);
+    }
+
+    // Back & Side Sanctum Arched Screen Walls (Garbhagriha Backdrop)
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(11.2, 6.2, 0.55), darkMarbleMat);
+    backWall.position.set(0, 4.4, -4.65);
+    const backWallGoldTrim = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.35, 0.65), goldMat);
+    backWallGoldTrim.position.set(0, 7.45, -4.65);
+    temple.add(backWall, backWallGoldTrim);
+
+    // 4. TOWERING NAGARA SHIKHARA (20.5m Tall Main Sanctum Spire + Mandap Dome + Urushringa Spires)
+    const roofCornice = new THREE.Mesh(new THREE.BoxGeometry(12.2, 0.68, 11.2), goldMat);
+    roofCornice.position.set(0, 7.65, 0.2);
+    temple.add(roofCornice);
+
+    // Front Sabha-Mandap Stepped Pyramid Dome
+    for (let m = 0; m < 4; m++) {
+      const mw = 8.4 - m * 1.65;
+      const md = 5.4 - m * 1.05;
+      const my = 8.25 + m * 0.65;
+      const mTier = new THREE.Mesh(
+        new THREE.BoxGeometry(mw, 0.62, md),
+        m % 2 === 0 ? sandstoneMat : goldMat
+      );
+      mTier.position.set(0, my, 2.35);
+      temple.add(mTier);
+    }
+    const frontKalash = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 14), brightGoldMat);
+    frontKalash.position.set(0, 11.1, 2.35);
+    temple.add(frontKalash);
+
+    // Main Garbhagriha Nagara Shikhara (7 Sculpted Tiers rising to 20.5m)
+    const shikharaZ = -1.85;
+    for (let t = 0; t < 7; t++) {
+      const progress = t / 6;
+      const w = THREE.MathUtils.lerp(8.8, 2.8, progress);
+      const h = 1.38;
+      const y = 8.55 + t * 1.32;
+      const tierBox = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, w),
+        t % 2 === 0 ? sandstoneMat : goldMat
+      );
+      tierBox.position.set(0, y, shikharaZ);
+      temple.add(tierBox);
+
+      // Golden Gavaksha Arch Ribbing on front & sides of each Shikhara tier
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(w + 0.18, 0.22, w + 0.18), brightGoldMat);
+      rib.position.set(0, y + 0.52, shikharaZ);
+      temple.add(rib);
+    }
+
+    // 4 Corner Urushringa (Subsidiary Spires) around the main Shikhara
+    for (const [ux, uz] of [
+      [-4.2, -3.6],
+      [4.2, -3.6],
+      [-4.2, 0.1],
+      [4.2, 0.1],
+    ]) {
+      const subSpire = new THREE.Mesh(new THREE.ConeGeometry(1.15, 4.2, 8), sandstoneMat);
+      subSpire.position.set(ux, 10.1, uz);
+      const subKalash = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 12), brightGoldMat);
+      subKalash.position.set(ux, 12.35, uz);
+      temple.add(subSpire, subKalash);
+    }
+
+    // Crown Amalaka Disc, Swarna Kalash & Waving Saffron Dharma Dhwaja (Flag) at y = 20.5m
+    const amalaka = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.36, 12, 24), brightGoldMat);
+    amalaka.rotation.x = Math.PI / 2;
+    amalaka.position.set(0, 17.45, shikharaZ);
+    const mainKalash = new THREE.Mesh(new THREE.SphereGeometry(0.88, 18, 16), brightGoldMat);
+    mainKalash.position.set(0, 18.55, shikharaZ);
+    const kalashSpire = new THREE.Mesh(new THREE.ConeGeometry(0.38, 1.45, 12), brightGoldMat);
+    kalashSpire.position.set(0, 19.65, shikharaZ);
+    temple.add(amalaka, mainKalash, kalashSpire);
+
+    // Saffron Temple Flag (Dharma Dhwaja)
+    const flagPole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.4, 8), goldMat);
+    flagPole.position.set(0, 20.4, shikharaZ);
+    const flagShape = new THREE.Shape();
+    flagShape.moveTo(0, 0);
+    flagShape.lineTo(2.4, 0.45);
+    flagShape.lineTo(0, 0.95);
+    flagShape.closePath();
+    const flagGeo = new THREE.ExtrudeGeometry(flagShape, { depth: 0.04, bevelEnabled: false });
+    const flagMat = new THREE.MeshStandardMaterial({
+      color: 0xff6200,
+      emissive: 0x802b00,
+      emissiveIntensity: 0.4,
+      roughness: 0.4,
+      side: THREE.DoubleSide,
+    });
+    const flagMesh = new THREE.Mesh(flagGeo, flagMat);
+    flagMesh.position.set(0.05, 20.55, shikharaZ);
+    this.templeFlagMesh = flagMesh;
+    temple.add(flagPole, flagMesh);
+
+    // Front Illuminated Temple Signboard & Marigold Torans
+    const templeSignTex = createSignboardTexture(
+      this.renderer,
+      'श्री लक्ष्मी-गणेश महा-मंदिर · LAXMI-GANESH MANDIR',
+      'Grand Diwali Darshan · Click Aarti Thali to Perform Maha-Aarti 🪔',
+      '#4a0e1c',
+      '#ffd768',
+      '#fff7e2'
+    );
+    const templeSign = new THREE.Mesh(
+      new THREE.PlaneGeometry(8.6, 1.45),
+      new THREE.MeshBasicMaterial({ map: templeSignTex })
+    );
+    templeSign.position.set(0, 7.65, 5.88);
+    temple.add(templeSign);
+
+    for (let g = -10; g <= 10; g++) {
+      const bola = new THREE.Mesh(
+        new THREE.SphereGeometry(0.22, 10, 10),
+        g % 2 === 0 ? marigoldOrangeMat : marigoldYellowMat
+      );
+      bola.position.set(g * 0.52, 6.72 + Math.sin(g * 0.85) * 0.18, 4.85);
+      temple.add(bola);
+    }
+
+    // 5. COLOSSAL SWARNA KAMAL SINHASAN (GOLDEN THRONE) AT SANCTUM CENTER
+    const sinhasanZ = -2.15;
+    const sinhasanBase = new THREE.Mesh(new THREE.BoxGeometry(8.6, 1.15, 2.9), goldMat);
+    sinhasanBase.position.set(0, 1.88, sinhasanZ);
+    const sinhasanVelvet = new THREE.Mesh(new THREE.BoxGeometry(8.3, 0.16, 2.65), crimsonVelvetMat);
+    sinhasanVelvet.position.set(0, 2.52, sinhasanZ);
+    temple.add(sinhasanBase, sinhasanVelvet);
+
+    // Ornate Prabhavali Golden Halo Arch behind both Deities
+    for (const idolX of [-2.15, 2.15]) {
+      const prabhavaliArch = new THREE.Mesh(
+        new THREE.TorusGeometry(2.05, 0.14, 12, 32, Math.PI),
+        brightGoldMat
+      );
+      prabhavaliArch.position.set(idolX, 4.35, sinhasanZ - 0.85);
+      temple.add(prabhavaliArch);
+    }
+
+    // Helper to build a Giant 16-Petal 3D Sculpted Padma (Lotus Asana)
+    const createGiantLotusThrone = (radius: number) => {
+      const lotusGroup = new THREE.Group();
+      const core = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.82, radius * 0.68, 0.34, 24), brightGoldMat);
+      core.position.y = 0.17;
+      lotusGroup.add(core);
+
+      const petalGeo = new THREE.SphereGeometry(0.38, 12, 10);
+      petalGeo.scale(0.65, 0.36, 1.45);
+      for (let p = 0; p < 16; p++) {
+        const angle = (p / 16) * Math.PI * 2;
+        const petal = new THREE.Mesh(petalGeo, lotusPinkMat);
+        petal.position.set(Math.cos(angle) * (radius * 0.84), 0.18, Math.sin(angle) * (radius * 0.84));
+        petal.rotation.y = -angle + Math.PI / 2;
+        petal.rotation.x = 0.28;
+        lotusGroup.add(petal);
+      }
+      return lotusGroup;
+    };
+
+    // ============================================================================
+    // 6. VERY BIG IDOL 1: COLOSSAL LORD GANESHA MURTI (~4.6m Tall on Left Throne)
+    // ============================================================================
+    const ganeshRoot = new THREE.Group();
+    ganeshRoot.position.set(-2.15, 2.58, sinhasanZ);
+    ganeshRoot.userData.isTempleIdol = true;
+
+    const ganeshLotus = createGiantLotusThrone(1.48);
+    ganeshRoot.add(ganeshLotus);
+
+    const ganeshSkinMat = new THREE.MeshStandardMaterial({
+      color: 0xff9e6d,
+      emissive: 0x381205,
+      emissiveIntensity: 0.18,
+      roughness: 0.42,
+      metalness: 0.1,
+    });
+    const pitambariDhotiMat = new THREE.MeshStandardMaterial({
+      color: 0xffbe0b,
+      emissive: 0x4a3200,
+      emissiveIntensity: 0.2,
+      roughness: 0.38,
+      metalness: 0.25,
+    });
+    const redSilkMat = new THREE.MeshStandardMaterial({
+      color: 0xd91e36,
+      emissive: 0x450610,
+      emissiveIntensity: 0.22,
+      roughness: 0.4,
+      metalness: 0.2,
+    });
+
+    // Crossed Seated Legs in Pitambari Yellow Silk Dhoti
+    const gLeftLeg = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.85, 8, 14), pitambariDhotiMat);
+    gLeftLeg.rotation.z = Math.PI / 2;
+    gLeftLeg.rotation.y = 0.25;
+    gLeftLeg.position.set(-0.32, 0.56, 0.35);
+    const gRightLeg = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.85, 8, 14), pitambariDhotiMat);
+    gRightLeg.rotation.z = Math.PI / 2;
+    gRightLeg.rotation.y = -0.25;
+    gRightLeg.position.set(0.32, 0.56, 0.35);
+    ganeshRoot.add(gLeftLeg, gRightLeg);
+
+    // Auspicious Lambodara Belly & Broad Torso + Sacred Janeu & Red Angavastram
+    const gBelly = new THREE.Mesh(new THREE.SphereGeometry(0.76, 20, 18), ganeshSkinMat);
+    gBelly.scale.set(1.06, 0.96, 0.95);
+    gBelly.position.set(0, 1.18, 0.08);
+    const gChest = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.72, 0.92, 18), ganeshSkinMat);
+    gChest.position.set(0, 1.78, 0);
+    const gKamarbandh = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.075, 10, 24), brightGoldMat);
+    gKamarbandh.rotation.x = Math.PI / 2;
+    gKamarbandh.position.set(0, 0.78, 0.06);
+    const gJaneu = new THREE.Mesh(new THREE.TorusGeometry(0.74, 0.035, 8, 24), brightGoldMat);
+    gJaneu.position.set(0, 1.48, 0.08);
+    gJaneu.rotation.set(0.35, 0.2, -0.68);
+    const gHaar = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.065, 10, 22), brightGoldMat);
+    gHaar.rotation.x = Math.PI / 2 - 0.35;
+    gHaar.position.set(0, 2.08, 0.22);
+    const gStole = new THREE.Mesh(new THREE.TorusGeometry(0.66, 0.09, 10, 20), redSilkMat);
+    gStole.rotation.x = Math.PI / 2 - 0.2;
+    gStole.position.set(0, 2.12, 0.05);
+    ganeshRoot.add(gBelly, gChest, gKamarbandh, gJaneu, gHaar, gStole);
+
+    // 4 Chaturbhuj Arms of Lord Ganesha
+    // 1) Lower Right Arm: Abhaya Mudra (Blessing Palm facing devotees)
+    const gArmLR = new THREE.Group();
+    gArmLR.position.set(-0.74, 1.85, 0.12);
+    const gUpperLR = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.52, 8, 12), ganeshSkinMat);
+    gUpperLR.position.set(-0.14, -0.25, 0.18);
+    gUpperLR.rotation.set(-0.5, 0, -0.35);
+    const gPalmLR = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.38, 0.12), ganeshSkinMat);
+    gPalmLR.position.set(-0.22, -0.15, 0.55);
+    const gTilakPalm = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xff2a2a })
+    );
+    gTilakPalm.position.set(-0.22, -0.15, 0.62);
+    gArmLR.add(gUpperLR, gPalmLR, gTilakPalm);
+    ganeshRoot.add(gArmLR);
+
+    // 2) Lower Left Arm: Holding Golden Plate of Sweet Modaks!
+    const gArmLL = new THREE.Group();
+    gArmLL.position.set(0.74, 1.85, 0.12);
+    const gUpperLL = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.55, 8, 12), ganeshSkinMat);
+    gUpperLL.position.set(0.14, -0.32, 0.24);
+    gUpperLL.rotation.set(-0.65, 0, 0.3);
+    const modakPlate = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.2, 0.06, 14), brightGoldMat);
+    modakPlate.position.set(0.22, -0.45, 0.58);
+    const giantModak = new THREE.Mesh(
+      new THREE.ConeGeometry(0.22, 0.32, 12),
+      new THREE.MeshStandardMaterial({ color: 0xfff3c4, emissive: 0x5c4300, emissiveIntensity: 0.25, roughness: 0.35 })
+    );
+    giantModak.position.set(0.22, -0.26, 0.58);
+    gArmLL.add(gUpperLL, modakPlate, giantModak);
+    ganeshRoot.add(gArmLL);
+
+    // 3) Upper Right Arm: Holding Sacred Golden Parashu / Ankush
+    const gArmUR = new THREE.Group();
+    gArmUR.position.set(-0.78, 2.02, -0.08);
+    const gUpperUR = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.62, 8, 12), ganeshSkinMat);
+    gUpperUR.position.set(-0.35, 0.32, 0);
+    gUpperUR.rotation.z = 0.78;
+    const parashuStaff = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.15, 8), brightGoldMat);
+    parashuStaff.position.set(-0.62, 0.68, 0.08);
+    const parashuBlade = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.42, 4), brightGoldMat);
+    parashuBlade.rotation.z = Math.PI / 2;
+    parashuBlade.position.set(-0.45, 1.1, 0.08);
+    gArmUR.add(gUpperUR, parashuStaff, parashuBlade);
+    ganeshRoot.add(gArmUR);
+
+    // 4) Upper Left Arm: Holding Blooming Pink Kamal (Sacred Lotus)
+    const gArmUL = new THREE.Group();
+    gArmUL.position.set(0.78, 2.02, -0.08);
+    const gUpperUL = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.62, 8, 12), ganeshSkinMat);
+    gUpperUL.position.set(0.35, 0.32, 0);
+    gUpperUL.rotation.z = -0.78;
+    const lotusStem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.035, 0.035, 0.85, 8),
+      new THREE.MeshStandardMaterial({ color: 0x2ec4b6 })
+    );
+    lotusStem.position.set(0.62, 0.68, 0.08);
+    const handLotus = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.36, 10), lotusPinkMat);
+    handLotus.rotation.x = Math.PI;
+    handLotus.position.set(0.62, 1.12, 0.08);
+    gArmUL.add(gUpperUL, lotusStem, handLotus);
+    ganeshRoot.add(gArmUL);
+
+    // Majestic Elephant Head (Gajanana), Fanned Ears, Single Tusk & Curved Trunk (Vakratunda)
+    const gHeadGroup = new THREE.Group();
+    gHeadGroup.position.set(0, 2.65, 0.08);
+    const gHead = new THREE.Mesh(new THREE.SphereGeometry(0.58, 20, 18), ganeshSkinMat);
+    gHeadGroup.add(gHead);
+
+    // Large Fanned Elephant Ears (Shurpakarna)
+    for (const earSide of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.52, 14, 12), ganeshSkinMat);
+      ear.scale.set(0.95, 1.15, 0.24);
+      ear.position.set(earSide * 0.72, 0.02, -0.08);
+      ear.rotation.y = earSide * -0.28;
+      gHeadGroup.add(ear);
+    }
+
+    // Sacred Red Sindoor Tilak / Trishul Mark on Forehead & Expressive Eyes
+    for (let line = -1; line <= 1; line++) {
+      const tripundra = new THREE.Mesh(
+        new THREE.BoxGeometry(0.34, 0.035, 0.04),
+        new THREE.MeshBasicMaterial({ color: 0xffdd55 })
+      );
+      tripundra.position.set(0, 0.22 + line * 0.055, 0.56);
+      gHeadGroup.add(tripundra);
+    }
+    const sindoorBindu = new THREE.Mesh(
+      new THREE.SphereGeometry(0.065, 10, 10),
+      new THREE.MeshBasicMaterial({ color: 0xff1e27 })
+    );
+    sindoorBindu.position.set(0, 0.22, 0.58);
+    gHeadGroup.add(sindoorBindu);
+
+    for (const eyeSide of [-1, 1]) {
+      const eyeWhite = new THREE.Mesh(
+        new THREE.SphereGeometry(0.065, 10, 10),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+      );
+      eyeWhite.position.set(eyeSide * 0.24, 0.06, 0.52);
+      const pupil = new THREE.Mesh(
+        new THREE.SphereGeometry(0.038, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0x140b07 })
+      );
+      pupil.position.set(eyeSide * 0.24, 0.06, 0.56);
+      gHeadGroup.add(eyeWhite, pupil);
+    }
+
+    // Curved Multi-Segment Trunk (Vakratunda) curling toward the Modak!
+    const trunkCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, -0.05, 0.52),
+      new THREE.Vector3(0, -0.42, 0.66),
+      new THREE.Vector3(0.08, -0.82, 0.62),
+      new THREE.Vector3(0.28, -0.95, 0.54),
+      new THREE.Vector3(0.36, -0.78, 0.52),
+    ]);
+    const trunkGeo = new THREE.TubeGeometry(trunkCurve, 20, 0.16, 12, false);
+    const trunkMesh = new THREE.Mesh(trunkGeo, ganeshSkinMat);
+    gHeadGroup.add(trunkMesh);
+
+    // Ivory Tusks (Right Whole Tusk + Left Ekadanta Half Tusk)
+    const ivoryMat = new THREE.MeshStandardMaterial({ color: 0xfffdf5, roughness: 0.25 });
+    const rightTusk = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.34, 10), ivoryMat);
+    rightTusk.position.set(-0.22, -0.22, 0.56);
+    rightTusk.rotation.x = Math.PI * 0.62;
+    const leftTusk = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.16, 10), ivoryMat);
+    leftTusk.position.set(0.22, -0.18, 0.54);
+    leftTusk.rotation.x = Math.PI * 0.62;
+    gHeadGroup.add(rightTusk, leftTusk);
+
+    // Towering Tiered Golden Ratna Mukut (Crown) & Rotating Chakra Halo
+    const gCrown1 = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.48, 0.42, 16), brightGoldMat);
+    gCrown1.position.y = 0.62;
+    const gCrown2 = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.85, 16), brightGoldMat);
+    gCrown2.position.y = 1.22;
+    const gCrownGem = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.12, 0),
+      new THREE.MeshBasicMaterial({ color: 0xff1744 })
+    );
+    gCrownGem.position.set(0, 0.65, 0.45);
+    gHeadGroup.add(gCrown1, gCrown2, gCrownGem);
+
+    const gHalo = new THREE.Group();
+    gHalo.position.set(0, 0.35, -0.45);
+    const haloRing = new THREE.Mesh(new THREE.RingGeometry(0.95, 1.32, 24), brightGoldMat);
+    const haloInner = new THREE.Mesh(
+      new THREE.CircleGeometry(0.95, 24),
+      new THREE.MeshBasicMaterial({ color: 0xffb703, transparent: true, opacity: 0.32, side: THREE.DoubleSide })
+    );
+    gHalo.add(haloRing, haloInner);
+    gHeadGroup.add(gHalo);
+    this.templeHalos.push(gHalo);
+
+    ganeshRoot.add(gHeadGroup);
+
+    // Sacred Vahana Mushak-Raj (Mouse) sitting near Ganesha's Lotus Base holding a Laddoo
+    const mushak = new THREE.Group();
+    mushak.position.set(-0.95, 0.25, 1.15);
+    mushak.rotation.y = 0.45;
+    const mBody = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 10, 10),
+      new THREE.MeshStandardMaterial({ color: 0x5c5346, roughness: 0.7 })
+    );
+    mBody.scale.set(0.85, 0.85, 1.25);
+    const mLaddoo = new THREE.Mesh(
+      new THREE.SphereGeometry(0.065, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffaa00 })
+    );
+    mLaddoo.position.set(0, 0.08, 0.22);
+    mushak.add(mBody, mLaddoo);
+    ganeshRoot.add(mushak);
+
+    temple.add(ganeshRoot);
+
+    // ============================================================================
+    // 7. VERY BIG IDOL 2: COLOSSAL MAA LAKSHMI MURTI (~4.7m Tall on Right Throne)
+    // ============================================================================
+    const laxmiRoot = new THREE.Group();
+    laxmiRoot.position.set(2.15, 2.58, sinhasanZ);
+    laxmiRoot.userData.isTempleIdol = true;
+
+    const laxmiLotus = createGiantLotusThrone(1.48);
+    laxmiRoot.add(laxmiLotus);
+
+    const laxmiSkinMat = new THREE.MeshStandardMaterial({
+      color: 0xffcba4,
+      emissive: 0x3b1b0a,
+      emissiveIntensity: 0.18,
+      roughness: 0.38,
+      metalness: 0.08,
+    });
+    const emeraldMat = new THREE.MeshStandardMaterial({
+      color: 0x00a86b,
+      roughness: 0.3,
+      metalness: 0.35,
+    });
+
+    // Seated / Enthroned Royal Sindoori Saree & Zari Border Drape
+    const lSkirt = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.78, 1.28, 20), redSilkMat);
+    lSkirt.position.set(0, 0.92, 0.05);
+    const lZariBorder = new THREE.Mesh(new THREE.CylinderGeometry(0.76, 0.8, 0.18, 20), brightGoldMat);
+    lZariBorder.position.set(0, 0.38, 0.05);
+    const lTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.44, 0.92, 18), emeraldMat);
+    lTorso.position.set(0, 1.82, 0);
+    const lPallu = new THREE.Mesh(new THREE.BoxGeometry(0.86, 1.05, 0.42), redSilkMat);
+    lPallu.position.set(0.04, 1.72, 0.04);
+    lPallu.rotation.z = 0.22;
+    const lKamarbandh = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.065, 10, 22), brightGoldMat);
+    lKamarbandh.rotation.x = Math.PI / 2;
+    lKamarbandh.position.set(0, 1.42, 0.04);
+    const lRaniHaar1 = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.055, 10, 22), brightGoldMat);
+    lRaniHaar1.rotation.x = Math.PI / 2 - 0.38;
+    lRaniHaar1.position.set(0, 2.15, 0.18);
+    const lRaniHaar2 = new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.045, 10, 22), brightGoldMat);
+    lRaniHaar2.rotation.x = Math.PI / 2 - 0.42;
+    lRaniHaar2.position.set(0, 2.02, 0.21);
+    laxmiRoot.add(lSkirt, lZariBorder, lTorso, lPallu, lKamarbandh, lRaniHaar1, lRaniHaar2);
+
+    // 4 Chaturbhuj Arms of Maa Lakshmi
+    // 1) Upper Right & Upper Left Arms holding Twin Blooming Pink Lotuses (Padma)
+    for (const side of [-1, 1]) {
+      const uArm = new THREE.Group();
+      uArm.position.set(side * 0.56, 2.06, -0.06);
+      const uLimb = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.58, 8, 12), laxmiSkinMat);
+      uLimb.position.set(side * 0.32, 0.28, 0);
+      uLimb.rotation.z = side * -0.74;
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.03, 0.03, 0.78, 8),
+        new THREE.MeshStandardMaterial({ color: 0x2ec4b6 })
+      );
+      stem.position.set(side * 0.58, 0.65, 0.06);
+      const bloom = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.38, 12), lotusPinkMat);
+      bloom.rotation.x = Math.PI;
+      bloom.position.set(side * 0.58, 1.05, 0.06);
+      const bloomGoldCenter = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 10), brightGoldMat);
+      bloomGoldCenter.position.set(side * 0.58, 1.18, 0.06);
+      uArm.add(uLimb, stem, bloom, bloomGoldCenter);
+      laxmiRoot.add(uArm);
+    }
+
+    // 2) Lower Right Arm: Abhaya Mudra (Blessing Hand)
+    const lArmLR = new THREE.Group();
+    lArmLR.position.set(-0.52, 1.9, 0.1);
+    const lLimbLR = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.48, 8, 12), laxmiSkinMat);
+    lLimbLR.position.set(-0.12, -0.22, 0.18);
+    lLimbLR.rotation.set(-0.52, 0, -0.28);
+    const lPalmLR = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.34, 0.1), laxmiSkinMat);
+    lPalmLR.position.set(-0.18, -0.1, 0.48);
+    lArmLR.add(lLimbLR, lPalmLR);
+    laxmiRoot.add(lArmLR);
+
+    // 3) Lower Left Arm: Holding Swarna Kalash Pouring Stream of Gold Coins (Dhan-Varsha!)
+    const lArmLL = new THREE.Group();
+    lArmLL.position.set(0.52, 1.9, 0.1);
+    const lLimbLL = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.48, 8, 12), laxmiSkinMat);
+    lLimbLL.position.set(0.14, -0.28, 0.22);
+    lLimbLL.rotation.set(-0.62, 0, 0.25);
+    const dhanKalash = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 12), brightGoldMat);
+    dhanKalash.position.set(0.22, -0.45, 0.52);
+    lArmLL.add(lLimbLL, dhanKalash);
+    laxmiRoot.add(lArmLL);
+
+    // Cascading Stream of Golden Coins into a Treasure Urli at Maa Lakshmi's Feet
+    const coinUrli = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.28, 0.22, 16), brightGoldMat);
+    coinUrli.position.set(0.45, 0.36, 1.05);
+    laxmiRoot.add(coinUrli);
+    for (let c = 0; c < 10; c++) {
+      const tCoin = c / 9;
+      const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.025, 12), brightGoldMat);
+      coin.rotation.x = Math.PI / 3;
+      coin.position.set(
+        THREE.MathUtils.lerp(0.72, 0.45, tCoin) + Math.sin(c) * 0.04,
+        THREE.MathUtils.lerp(1.38, 0.48, tCoin),
+        THREE.MathUtils.lerp(0.62, 1.05, tCoin)
+      );
+      laxmiRoot.add(coin);
+    }
+
+    // Serene Divine Face of Maa Lakshmi, Kumkum Bindi, Golden Nath & Towering Swarna Mukut
+    const lHeadGroup = new THREE.Group();
+    lHeadGroup.position.set(0, 2.66, 0.05);
+    const lHead = new THREE.Mesh(new THREE.SphereGeometry(0.46, 20, 18), laxmiSkinMat);
+    lHeadGroup.add(lHead);
+
+    const lBindi = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 10, 10),
+      new THREE.MeshBasicMaterial({ color: 0xff1744 })
+    );
+    lBindi.position.set(0, 0.14, 0.44);
+    const lNath = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.012, 8, 14), brightGoldMat);
+    lNath.position.set(0.06, -0.04, 0.45);
+    lHeadGroup.add(lBindi, lNath);
+
+    for (const eyeSide of [-1, 1]) {
+      const eyeW = new THREE.Mesh(
+        new THREE.SphereGeometry(0.055, 10, 10),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+      );
+      eyeW.position.set(eyeSide * 0.16, 0.05, 0.42);
+      const pupil = new THREE.Mesh(
+        new THREE.SphereGeometry(0.032, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0x140b07 })
+      );
+      pupil.position.set(eyeSide * 0.16, 0.05, 0.45);
+      const jhumka = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.22, 10), brightGoldMat);
+      jhumka.position.set(eyeSide * 0.46, -0.08, 0);
+      lHeadGroup.add(eyeW, pupil, jhumka);
+    }
+
+    const lCrown1 = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.44, 0.42, 16), brightGoldMat);
+    lCrown1.position.y = 0.52;
+    const lCrown2 = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.92, 16), brightGoldMat);
+    lCrown2.position.y = 1.15;
+    lHeadGroup.add(lCrown1, lCrown2);
+
+    const lHalo = new THREE.Group();
+    lHalo.position.set(0, 0.28, -0.42);
+    const lHaloRing = new THREE.Mesh(new THREE.RingGeometry(0.95, 1.32, 24), brightGoldMat);
+    const lHaloInner = new THREE.Mesh(
+      new THREE.CircleGeometry(0.95, 24),
+      new THREE.MeshBasicMaterial({ color: 0xff4d88, transparent: true, opacity: 0.32, side: THREE.DoubleSide })
+    );
+    lHalo.add(lHaloRing, lHaloInner);
+    lHeadGroup.add(lHalo);
+    this.templeHalos.push(lHalo);
+
+    laxmiRoot.add(lHeadGroup);
+    temple.add(laxmiRoot);
+
+    // 8. CENTRAL SHUBH-LABH KALASH & TWIN TALL BRASS DEEP-STAMBHS FLANKING THE IDOLS
+    for (const stambhSide of [-4.15, 4.15]) {
+      const stambh = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.24, 3.2, 12), brightGoldMat);
+      stambh.position.set(stambhSide, 2.9, sinhasanZ + 0.85);
+      temple.add(stambh);
+      for (const tierY of [2.2, 3.1, 4.0]) {
+        const { group: sDiya } = this.createClayDiyaMesh(0.85, true);
+        sDiya.position.set(stambhSide, tierY, sinhasanZ + 1.05);
+        temple.add(sDiya);
+      }
+    }
+
+    // Mahaprasad Bhog Thali in front of the Sinhasan (Modaks & Kaju Katli)
+    const prasadGroup = new THREE.Group();
+    prasadGroup.position.set(0, 2.62, sinhasanZ + 1.05);
+    const bhogPlate = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.42, 0.08, 18), brightGoldMat);
+    prasadGroup.add(bhogPlate);
+    for (let m = 0; m < 7; m++) {
+      const a = (m / 7) * Math.PI * 2;
+      const laddoo = new THREE.Mesh(
+        new THREE.SphereGeometry(0.11, 10, 10),
+        new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0x663300, emissiveIntensity: 0.3 })
+      );
+      laddoo.position.set(Math.cos(a) * 0.24, 0.1, Math.sin(a) * 0.24);
+      prasadGroup.add(laddoo);
+    }
+    temple.add(prasadGroup);
+    this.templePrasadGroup = prasadGroup;
+
+    // 9. GIANT HANGING BRASS TEMPLE BELL (MANDIR GHANTI) IN SABHA-MANDAP
+    const bellPivot = new THREE.Group();
+    bellPivot.position.set(0, 7.1, 2.45);
+    const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.35, 8), brightGoldMat);
+    chain.position.y = -0.68;
+    const bellDome = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.56, 0.72, 18), brightGoldMat);
+    bellDome.position.y = -1.55;
+    const bellRim = new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.065, 10, 22), brightGoldMat);
+    bellRim.rotation.x = Math.PI / 2;
+    bellRim.position.y = -1.9;
+    const clapper = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 10), brightGoldMat);
+    clapper.position.y = -2.02;
+    const bellHitbox = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.1, 1.1, 2.2, 10),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    bellHitbox.position.y = -1.4;
+    bellHitbox.userData.isTempleBell = true;
+    bellPivot.add(chain, bellDome, bellRim, clapper, bellHitbox);
+    temple.add(bellPivot);
+    this.templeBellPivot = bellPivot;
+
+    // 10. INTERACTIVE SACRED GOLDEN AARTI THALI ON CARVED CHOWKI PEDESTAL
+    const chowki = new THREE.Group();
+    chowki.position.set(0, 1.32, 2.85);
+    const chowkiBase = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.78, 0.78, 18), sandstoneMat);
+    chowkiBase.position.y = 0.39;
+    const chowkiTop = new THREE.Mesh(new THREE.CylinderGeometry(0.82, 0.72, 0.12, 18), goldMat);
+    chowkiTop.position.y = 0.8;
+    chowki.add(chowkiBase, chowkiTop);
+    temple.add(chowki);
+
+    const aartiThaliGroup = new THREE.Group();
+    aartiThaliGroup.position.copy(this.templeAartiBasePos);
+
+    // Wide Ornate Golden Brass Thali Plate with Embossed Rim
+    const thaliPlate = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.46, 0.06, 24), brightGoldMat);
+    const thaliRim = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.045, 10, 24), brightGoldMat);
+    thaliRim.rotation.x = Math.PI / 2;
+    thaliRim.position.y = 0.03;
+    aartiThaliGroup.add(thaliPlate, thaliRim);
+
+    // 5-Wick Panchmukhi Aarti Diya in the Center + 4 Surrounding Diyas on the Thali
+    const { group: centerAartiDiya } = this.createClayDiyaMesh(0.95, true);
+    centerAartiDiya.position.set(0, 0.04, 0.12);
+    aartiThaliGroup.add(centerAartiDiya);
+
+    for (const [dx, dz] of [
+      [-0.28, 0.18],
+      [0.28, 0.18],
+      [-0.26, -0.18],
+      [0.26, -0.18],
+    ]) {
+      const { group: miniDiya } = this.createClayDiyaMesh(0.58, true);
+      miniDiya.position.set(dx, 0.04, dz);
+      aartiThaliGroup.add(miniDiya);
+    }
+
+    // Silver/Gold Kalash Lota, Kumkum & Haldi Katoris, and Marigold Flowers on the Thali
+    const lota = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 12), brightGoldMat);
+    lota.position.set(0, 0.12, -0.28);
+    const kumkumBowl = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.09, 0.07, 0.06, 12),
+      new THREE.MeshStandardMaterial({ color: 0xe6192e, roughness: 0.5 })
+    );
+    kumkumBowl.position.set(-0.36, 0.06, -0.02);
+    const haldiBowl = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.09, 0.07, 0.06, 12),
+      new THREE.MeshStandardMaterial({ color: 0xffb703, roughness: 0.5 })
+    );
+    haldiBowl.position.set(0.36, 0.06, -0.02);
+    aartiThaliGroup.add(lota, kumkumBowl, haldiBowl);
+
+    // Generous Invisible Hitbox around the Aarti Thali so clicking/dragging is effortless
+    const thaliHitbox = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.15, 1.15, 1.2, 12),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    thaliHitbox.position.y = 0.25;
+    thaliHitbox.userData.isTempleAarti = true;
+    aartiThaliGroup.add(thaliHitbox);
+
+    temple.add(aartiThaliGroup);
+    this.templeAartiThali = aartiThaliGroup;
+
+    // Warm Sanctum Point Lights illuminating the Giant Laxmi-Ganesh Idols & Aarti Thali
+    const sanctumLight = new THREE.PointLight(0xffcf6e, 32, 22, 1.4);
+    sanctumLight.position.set(0, 5.8, 0.8);
+    const aartiGlowLight = new THREE.PointLight(0xffaa33, 14, 12, 1.5);
+    aartiGlowLight.position.set(0, 2.8, 3.2);
+    temple.add(sanctumLight, aartiGlowLight);
+
+    this.addContactShadow(temple, 16.5, 15.5);
+    this.dynamicRoot.add(temple);
+  }
+
   private buildGrandAkashdeepTower(spec: MelaInteractableSpec): void {
     const tower = new THREE.Group();
     tower.position.set(spec.x, 0, spec.z);
@@ -2120,6 +2955,10 @@ export class MelaEngine {
       if (this.mode === 'walk' || this.mode === 'ride' || this.mode === 'firework-show') {
         this.player.yaw -= dx * 0.0042;
         this.player.pitch = THREE.MathUtils.clamp(this.player.pitch - dy * 0.0032, -0.75, 0.85);
+      } else if (this.mode === 'temple-aarti') {
+        // Dragging pointer/finger in Temple Aarti mode circles the Golden Aarti Thali in front of Laxmi-Ganesh!
+        const deltaAngle = (dx - dy * 0.6) * 0.022;
+        this.advanceManualTempleAarti( Math.max(0.06, Math.abs(deltaAngle)) );
       }
     };
 
@@ -2142,6 +2981,10 @@ export class MelaEngine {
           }
         } else if (this.mode === 'rangoli') {
           this.handleRangoliTap(e.clientX, e.clientY);
+        } else if (this.mode === 'temple-aarti') {
+          if (!this.checkSpecialInteractablesClick(e.clientX, e.clientY)) {
+            this.performTempleAartiWave();
+          }
         } else if (this.mode === 'walk') {
           if (!this.checkDaanPetiClick(e.clientX, e.clientY)) {
             if (!this.checkRangoliClick(e.clientX, e.clientY)) {
@@ -2215,11 +3058,16 @@ export class MelaEngine {
     }
 
     // Position player right in front of the stall or attraction facing it
-    const dist = spec.type === 'wheel' || spec.type === 'well' || spec.type === 'finale' ? 11 : 4.6;
+    const dist =
+      spec.type === 'wheel' || spec.type === 'well' || spec.type === 'finale'
+        ? 11
+        : spec.type === 'temple'
+        ? 9.2
+        : 4.6;
     this.player.x = spec.x + Math.sin(spec.rotY) * dist;
     this.player.z = spec.z + Math.cos(spec.rotY) * dist;
     this.player.yaw = Math.atan2(this.player.x - spec.x, this.player.z - spec.z);
-    this.player.pitch = 0.05;
+    this.player.pitch = spec.type === 'temple' ? 0.12 : 0.05;
     this.setMode('walk', null);
     this.audio.effect('sparkle');
   }
@@ -2726,6 +3574,106 @@ export class MelaEngine {
     this.setMode('finale', this.activeSpec);
   }
 
+  public startTempleAarti(spec?: MelaInteractableSpec): void {
+    const targetSpec = spec || this.interactables.find((s) => s.type === 'temple') || null;
+    this.activeSpec = targetSpec;
+    this.templeAartiCircles = 0;
+    this.templeAartiAngle = 0;
+    this.templeAartiTimer = 4.5;
+    this.templeBellTimer = 4.0;
+    this.audio.effect('bell');
+    this.audio.speak('Om Gan Ganpataye Namah! Om Mahalakshmyai Namah! Aarti Thali ghumaiye aur aashirwad lijiye!');
+
+    this.gameState = {
+      mode: 'temple-aarti',
+      shotsLeft: 5,
+      score: 1,
+      totalTargets: 5,
+      done: false,
+      message:
+        'Click "Wave Aarti Thali" or drag your mouse/finger in circles to perform 5 sacred Aarti rounds before Maa Lakshmi & Lord Ganesha!',
+    };
+    this.setMode('temple-aarti', targetSpec);
+    this.callbacks.onGameUpdate({ ...this.gameState });
+  }
+
+  private advanceManualTempleAarti(angleStep: number): void {
+    this.templeAartiAngle += angleStep;
+    this.templeAartiTimer = Math.max(this.templeAartiTimer, 0.35);
+
+    const newCircles = Math.min(5, 1 + Math.floor(this.templeAartiAngle / (Math.PI * 1.6)));
+    if (newCircles > this.templeAartiCircles) {
+      this.templeAartiCircles = newCircles;
+      this.audio.effect('bell');
+      this.spawnFireworkBurst(0, 4.8, -34.5, 28, 0xffd768);
+
+      if (this.gameState && this.gameState.mode === 'temple-aarti') {
+        this.gameState.score = this.templeAartiCircles;
+        this.gameState.shotsLeft = Math.max(0, 5 - this.templeAartiCircles);
+        if (this.templeAartiCircles >= 5 && !this.gameState.done) {
+          this.gameState.done = true;
+          this.audio.effect('cheer');
+          this.collectItem('Shri Laxmi-Ganesh Maha-Aarti Siddhi Blessing');
+          this.gameState.message =
+            'शतायु भव! सौभाग्यवती भव! All 5 Maha-Aarti rounds complete! Maa Lakshmi & Lord Ganesha Blessings added to your Mela Bag!';
+        } else {
+          this.gameState.message = `Maha-Aarti Round ${this.templeAartiCircles} of 5! Keep circling the Golden Aarti Thali or shower Pushpanjali flowers!`;
+        }
+        this.callbacks.onGameUpdate({ ...this.gameState });
+      }
+    }
+  }
+
+  public performTempleAartiWave(): void {
+    this.templeAartiTimer = 6.5;
+    this.templeBellTimer = 4.2;
+    this.audio.effect('bell');
+    this.advanceManualTempleAarti(Math.PI * 1.7);
+    this.spawnFireworkBurst(-2.1, 5.4, -35.5, 32, 0xffbe0b);
+    this.spawnFireworkBurst(2.1, 5.4, -35.5, 32, 0xff4d88);
+    this.collectItem('Shri Laxmi-Ganesh Aarti Aashirwad');
+    this.callbacks.onToast('🪔 Performing Shri Laxmi-Ganesh Maha-Aarti with the Golden Panchmukhi Thali!');
+  }
+
+  public ringTempleBell(): void {
+    this.templeBellTimer = 4.5;
+    this.audio.effect('bell');
+    this.spawnFireworkBurst(0, 6.2, -31.5, 30, 0xffd768);
+    this.collectItem('Laxmi-Ganesh Mandir Ghanti Blessing');
+    this.callbacks.onToast('🔔 घंटा-नाद! The grand brass Mandir Ghanti echoes across the Diwali Mela!');
+  }
+
+  public offerTemplePushpanjali(): void {
+    this.audio.effect('sparkle');
+    this.audio.effect('cheer');
+    // Shower golden marigold & pink lotus petals over both giant idols!
+    for (const ix of [-2.15, 0, 2.15]) {
+      this.spawnFireworkBurst(ix, 6.8, -35.8, 42, ix < 0 ? 0xff9f1c : ix > 0 ? 0xff4d88 : 0xffd768);
+    }
+    this.collectItem('Pushpanjali Kamal & Genda Aashirwad');
+    if (this.gameState && this.gameState.mode === 'temple-aarti') {
+      this.gameState.message = '🌸 Pushpanjali offered! Marigold and lotus petals shower over Maa Lakshmi & Lord Ganesha!';
+      this.callbacks.onGameUpdate({ ...this.gameState });
+    }
+    this.callbacks.onToast('🌸 Pushpanjali Flower Shower offered at the lotus feet of Shri Laxmi-Ganesh!');
+  }
+
+  public offerTemplePrasad(): void {
+    this.audio.effect('eat');
+    this.audio.effect('sparkle');
+    this.spawnFireworkBurst(0, 3.6, -34.8, 34, 0xffcf56);
+    this.collectFoodOrItem(
+      'Laxmi-Ganesh Mandir Modak & Kaju Katli Mahaprasad',
+      true,
+      'Ganpati Bappa Morya! Mangal Murti Morya! Yeh lijiye Modak aur Kaju Katli ka pavitra Mahaprasad!'
+    );
+    if (this.gameState && this.gameState.mode === 'temple-aarti') {
+      this.gameState.message =
+        '🍬 Modak & Kaju Katli Bhog offered! Sacred Mandir Mahaprasad added to your Mela Bag!';
+      this.callbacks.onGameUpdate({ ...this.gameState });
+    }
+  }
+
   public leaveActivity(): void {
     const prev = this.activeSpec;
     this.gameState = null;
@@ -2733,11 +3681,16 @@ export class MelaEngine {
     this.callbacks.onCinematic(null);
 
     if (prev) {
-      const dist = prev.type === 'wheel' || prev.type === 'well' || prev.type === 'finale' ? 11.5 : 4.8;
+      const dist =
+        prev.type === 'wheel' || prev.type === 'well' || prev.type === 'finale'
+          ? 11.5
+          : prev.type === 'temple'
+          ? 9.2
+          : 4.8;
       this.player.x = prev.x + Math.sin(prev.rotY) * dist;
       this.player.z = prev.z + Math.cos(prev.rotY) * dist;
       this.player.yaw = Math.atan2(this.player.x - prev.x, this.player.z - prev.z);
-      this.player.pitch = 0.04;
+      this.player.pitch = prev.type === 'temple' ? 0.12 : 0.04;
     }
     this.setMode('walk', null);
     this.renderer.domElement.focus();
@@ -2937,7 +3890,7 @@ export class MelaEngine {
         const nextZ = this.player.z + (-cosY * nf - sinY * ns) * speedMult * dt;
 
         this.player.x = THREE.MathUtils.clamp(nextX, -38, 38);
-        this.player.z = THREE.MathUtils.clamp(nextZ, -52, 48);
+        this.player.z = THREE.MathUtils.clamp(nextZ, -58, 48);
       }
 
       const headBob = mag > 0.1 ? Math.sin(t * (this.isRunning ? 12 : 8.5)) * 0.055 : 0;
@@ -2953,10 +3906,14 @@ export class MelaEngine {
 
       // Check proximity to interactables
       let closest: MelaInteractableSpec | null = null;
-      let minDist = 6.2;
+      let minDist = 11.5;
       for (const item of this.interactables) {
         const allowDist =
-          item.type === 'wheel' || item.type === 'well' || item.type === 'finale' || item.type === 'pirate-ship'
+          item.type === 'wheel' ||
+          item.type === 'well' ||
+          item.type === 'finale' ||
+          item.type === 'pirate-ship' ||
+          item.type === 'temple'
             ? 13.5
             : 5.8;
         const d = Math.hypot(this.player.x - item.x, this.player.z - item.z);
@@ -2994,6 +3951,14 @@ export class MelaEngine {
       // Overhead artist perspective looking down at the 3D Rangoli courtyard & 8 color bowls
       this.camera.position.set(spec.x, 5.5, spec.z + 3.0);
       this.camera.lookAt(spec.x, 0.15, spec.z - 0.15);
+      return;
+    }
+
+    if (this.mode === 'temple-aarti') {
+      const spec = this.activeSpec || { x: 0, z: -34 };
+      // Grand Sanctum Darshan Camera framing both colossal Laxmi-Ganesh idols & the Golden Aarti Thali
+      this.camera.position.set(spec.x + Math.sin(t * 0.35) * 0.45, 3.85, spec.z + 6.4);
+      this.camera.lookAt(spec.x, 4.35, spec.z - 2.0);
       return;
     }
 
@@ -3118,15 +4083,15 @@ export class MelaEngine {
       const progress = Math.min(1, this.fireworkTimer / 14);
       this.callbacks.onRideProgress(progress, 'Roshni Ka Jashn · Sky Fireworks');
 
-      this.camera.position.set(0, 3.2, -26);
-      this.camera.lookAt(Math.sin(t * 0.5) * 8, 16, -52);
+      this.camera.position.set(16, 3.2, -38);
+      this.camera.lookAt(16 + Math.sin(t * 0.5) * 8, 16, -54);
 
       if (Math.random() < 0.16) {
         this.audio.effect('firework');
         this.spawnFireworkBurst(
-          (Math.random() - 0.5) * 36,
+          16 + (Math.random() - 0.5) * 32,
           12 + Math.random() * 16,
-          -42 - Math.random() * 22,
+          -48 - Math.random() * 20,
           65
         );
       }
@@ -3141,10 +4106,10 @@ export class MelaEngine {
       this.finaleTimer += dt;
       const ft = this.finaleTimer;
 
-      // Sweeping cinematic camera around the 20m Swarna Deep-Stambh
+      // Sweeping cinematic camera around the 20m Swarna Deep-Stambh at z = -62
       const camAngle = ft * 0.22;
-      this.camera.position.set(Math.sin(camAngle) * 18, 6.5 + Math.min(8, ft * 0.45), -36 + Math.cos(camAngle) * 6);
-      this.camera.lookAt(0, 12 + Math.min(6, ft * 0.35), -56);
+      this.camera.position.set(Math.sin(camAngle) * 18, 6.5 + Math.min(8, ft * 0.45), -44 + Math.cos(camAngle) * 6);
+      this.camera.lookAt(0, 12 + Math.min(6, ft * 0.35), -62);
 
       const newPhase =
         ft < 4.5
@@ -3967,11 +4932,11 @@ export class MelaEngine {
         greetingText: 'Happy Diwali! आओ मिलकर आँगन में सुंदर रंगोली सजाएं!',
         voiceLine: 'Happy Diwali! Come fill the floor Rangoli with vibrant festive colors!',
       },
-      // Standing near Ram Leela Cultural Stage (x: -2.4, z: -29.5)
+      // Standing near Ram Leela Cultural Stage (x: -18.5, z: -44)
       {
         name: 'Dada Ji',
-        x: -2.4,
-        z: -29.5,
+        x: -18.5,
+        z: -44.0,
         yaw: Math.PI,
         outfitColor: 0x8d6e63,
         secondaryColor: 0xffe082,
@@ -3979,6 +4944,31 @@ export class MelaEngine {
         hasTurban: true,
         greetingText: 'जय श्री राम! शुभ दीपावली! अयोध्या में श्री राम के आगमन का उत्सव!',
         voiceLine: 'Jai Shri Ram! Shubh Deepavali! Rejoice in the grand return of Lord Rama!',
+      },
+      // Standing at the stairs of Shri Laxmi-Ganesh Maha-Mandir (x: -3.5, z: -25.2)
+      {
+        name: 'Pandit Raghunath Ji',
+        x: -3.5,
+        z: -25.2,
+        yaw: 0.25,
+        outfitColor: 0xff6d00,
+        secondaryColor: 0xfff8e1,
+        style: 'kurta',
+        hasTurban: true,
+        greetingText: 'जय श्री गणेश! जय माँ लक्ष्मी! भव्य मंदिर में पधारें और आरती थाली से महा-आरती करें!',
+        voiceLine: 'Jai Shri Ganesh! Jai Maa Lakshmi! Step into the grand temple and perform Maha Aarti!',
+      },
+      {
+        name: 'Bhakt Anjali',
+        x: 3.5,
+        z: -25.2,
+        yaw: -0.25,
+        outfitColor: 0xc2185b,
+        secondaryColor: 0xffd54f,
+        style: 'saree',
+        hasSparkler: true,
+        greetingText: 'शुभ दीपावली! लक्ष्मी-गणेश जी की इतनी विशाल और सुंदर मूर्ति देखकर मन धन्य हो गया!',
+        voiceLine: 'Shubh Deepavali! Having darshan of the grand Laxmi Ganesh idols feels so divine!',
       },
     ];
 
@@ -4169,12 +5159,12 @@ export class MelaEngine {
         walkSpeed: 1.6,
         waypoints: [
           { x: -14, z: -18 },
-          { x: -6, z: -28 },
-          { x: 6, z: -28 },
+          { x: -6, z: -24.2 },
+          { x: 6, z: -24.2 },
           { x: 14, z: -18 },
         ],
-        greetingText: 'Happy Diwali! आकाशदीप टावर का ग्रैंड फिनाले ज़रूर देखना!',
-        voiceLine: 'Happy Diwali! Make sure you watch the Grand Finale of 108 sky lanterns!',
+        greetingText: 'Happy Diwali! श्री लक्ष्मी-गणेश महा-मंदिर में आरती ज़रूर करना!',
+        voiceLine: 'Happy Diwali! Make sure you visit the grand Laxmi Ganesh Temple and perform Aarti!',
       },
       {
         name: 'Simran',
@@ -4186,8 +5176,8 @@ export class MelaEngine {
         walkSpeed: 1.55,
         waypoints: [
           { x: 14, z: -19 },
-          { x: 6, z: -29 },
-          { x: -6, z: -29 },
+          { x: 6, z: -24.8 },
+          { x: -6, z: -24.8 },
           { x: -14, z: -19 },
         ],
         greetingText: 'शुभ दीपावली! सेल्फी तोरण पर फोटो पोस्टकार्ड बनाना मत भूलना!',
@@ -4611,14 +5601,17 @@ export class MelaEngine {
     this.pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.pointerNDC, this.camera);
 
-    // 1. Check Mandir Ghanti (Temple Bell) & Maha-Aarti Thali
+    // 1. Check Mandir Ghanti (Temple Bell) & Maha-Aarti Thali (7 Diyas Mandap + Grand Laxmi-Ganesh Temple)
     const mandapTargets: THREE.Object3D[] = [];
     if (this.mandapBellPivot) mandapTargets.push(this.mandapBellPivot);
     if (this.mandapAartiThali) mandapTargets.push(this.mandapAartiThali);
+    if (this.templeBellPivot) mandapTargets.push(this.templeBellPivot);
+    if (this.templeAartiThali) mandapTargets.push(this.templeAartiThali);
+    if (this.templeGroup) mandapTargets.push(this.templeGroup);
 
     if (mandapTargets.length > 0) {
       const hits = this.raycaster.intersectObjects(mandapTargets, true);
-      if (hits.length > 0 && hits[0].distance < 26) {
+      if (hits.length > 0 && hits[0].distance < 28) {
         let obj: THREE.Object3D | null = hits[0].object;
         while (obj) {
           if (obj === this.mandapBellPivot || obj.userData?.isMandapBell) {
@@ -4627,6 +5620,28 @@ export class MelaEngine {
           }
           if (obj === this.mandapAartiThali || obj.userData?.isMandapAarti) {
             this.performMahaAarti();
+            return true;
+          }
+          if (obj === this.templeBellPivot || obj.userData?.isTempleBell) {
+            this.ringTempleBell();
+            return true;
+          }
+          if (obj === this.templeAartiThali || obj.userData?.isTempleAarti) {
+            if (this.mode !== 'temple-aarti') {
+              const tSpec = this.interactables.find((s) => s.type === 'temple');
+              this.startTempleAarti(tSpec);
+            } else {
+              this.performTempleAartiWave();
+            }
+            return true;
+          }
+          if (obj.userData?.isTempleIdol) {
+            if (this.mode !== 'temple-aarti') {
+              const tSpec = this.interactables.find((s) => s.type === 'temple');
+              this.startTempleAarti(tSpec);
+            } else {
+              this.offerTemplePushpanjali();
+            }
             return true;
           }
           obj = obj.parent;
@@ -4661,7 +5676,7 @@ export class MelaEngine {
   private updateSpecialFestiveAnimations(dt: number): void {
     const t = this.elapsed;
 
-    // 1. Swinging Brass Temple Bell (Mandir Ghanti)
+    // 1. Swinging Brass Temple Bell (Mandir Ghanti at 7 Diyas Mandap)
     if (this.mandapBellPivot) {
       if (this.mandapBellTimer > 0) {
         this.mandapBellTimer = Math.max(0, this.mandapBellTimer - dt);
@@ -4672,7 +5687,51 @@ export class MelaEngine {
       }
     }
 
-    // 2. Circular Sacred Orbit of the Golden Maha-Aarti Thali
+    // 1b. Grand Laxmi-Ganesh Temple Bell, Rotating Divine Halos, Waving Flag & Sacred Aarti Thali
+    if (this.templeBellPivot) {
+      if (this.templeBellTimer > 0) {
+        this.templeBellTimer = Math.max(0, this.templeBellTimer - dt);
+        const damping = this.templeBellTimer / 4.5;
+        this.templeBellPivot.rotation.z = Math.sin(t * 13) * 0.52 * damping;
+      } else {
+        this.templeBellPivot.rotation.z = Math.sin(t * 1.4) * 0.035;
+      }
+    }
+
+    for (const halo of this.templeHalos) {
+      halo.rotation.z = t * 0.55;
+    }
+
+    if (this.templeFlagMesh) {
+      this.templeFlagMesh.rotation.y = Math.sin(t * 4.2) * 0.24;
+    }
+
+    if (this.templeAartiThali) {
+      if (this.templeAartiTimer > 0) {
+        this.templeAartiTimer = Math.max(0, this.templeAartiTimer - dt);
+        this.templeAartiAngle += dt * 3.8;
+        const radiusX = 1.15;
+        const radiusY = 0.78;
+        this.templeAartiThali.position.set(
+          this.templeAartiBasePos.x + Math.cos(this.templeAartiAngle) * radiusX,
+          this.templeAartiBasePos.y + 0.92 + Math.sin(this.templeAartiAngle) * radiusY,
+          this.templeAartiBasePos.z + 0.35
+        );
+        if (Math.random() < 0.55) {
+          this.templeAartiThali.getWorldPosition(_vec3);
+          this.spawnFireworkBurst(_vec3.x, _vec3.y + 0.18, _vec3.z, 2, 0xffd768);
+        }
+      } else {
+        // Gentle inviting hover on the Chowki pedestal
+        this.templeAartiThali.position.set(
+          this.templeAartiBasePos.x,
+          this.templeAartiBasePos.y + Math.sin(t * 2.5) * 0.03,
+          this.templeAartiBasePos.z
+        );
+      }
+    }
+
+    // 2. Circular Sacred Orbit of the Golden Maha-Aarti Thali (7 Diyas Mandap)
     if (this.mandapAartiThali) {
       if (this.mandapAartiTimer > 0) {
         this.mandapAartiTimer = Math.max(0, this.mandapAartiTimer - dt);

@@ -338,8 +338,10 @@ export default function App() {
     ? 'Shubh Deepavali Entrance & Toran'
     : playerMapPos.z > 0
     ? 'Mithai & Chaat Bazaar Gali'
-    : playerMapPos.z > -24
+    : playerMapPos.z > -22
     ? 'Deepotsav Mandap & Jhoolon Ki Roshni'
+    : playerMapPos.z > -44
+    ? 'Shri Laxmi-Ganesh Maha-Mandir Plaza'
     : 'Ram Leela, Maut Ka Kuan & 1008 Akashdeep Maidan';
 
   return (
@@ -448,6 +450,21 @@ export default function App() {
               <span className="px-1.5 py-0.5 rounded-md bg-[#f1aa49]/20 text-[10px] font-mono-num text-[#ffd27d]">
                 {stats.items.length}
               </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                if (mode === 'welcome') {
+                  engineRef.current?.enterMela('temple-laxmi-ganesh');
+                } else {
+                  engineRef.current?.startTempleAarti();
+                }
+              }}
+              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-white/10 text-left text-[#ffe3a8] transition-colors cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#f1aa49] shrink-0" />
+              <span>Laxmi-Ganesh Maha-Mandir</span>
             </button>
 
             <button
@@ -584,6 +601,13 @@ export default function App() {
               </button>
 
               <button
+                onClick={() => engineRef.current?.enterMela('temple-laxmi-ganesh')}
+                className="px-4 py-4 rounded-lg bg-[#381912]/90 border border-[#f1aa49]/70 text-xs font-bold text-[#ffe5a3] hover:bg-[#4e2217] transition-colors whitespace-nowrap shrink-0 cursor-pointer shadow-lg"
+              >
+                🛕 LAXMI-GANESH MANDIR &amp; AARTI ↗
+              </button>
+
+              <button
                 onClick={() => engineRef.current?.enterMela('partner-meera')}
                 className="px-4 py-4 rounded-lg bg-[#152438]/90 border border-[#f1c17d]/40 text-xs font-semibold text-[#f8e6c7] hover:bg-[#1e324d] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
@@ -626,6 +650,7 @@ export default function App() {
             {/* Quick Teleport Pills */}
             <div className="flex flex-wrap items-center gap-1.5 pt-2">
               {[
+                { id: 'temple-laxmi-ganesh', label: '🛕 Shri Laxmi-Ganesh Maha-Mandir (Aarti)' },
                 { id: 'food-gola', label: '🍧 Kala Khatta Gola & Kulfi' },
                 { id: 'stall-bangles', label: '✨ Choodi & Mehendi Bazaar' },
                 { id: 'food-jalebi', label: 'Garam Jalebi & Chaat' },
@@ -767,7 +792,9 @@ export default function App() {
                     const cx = 50 + item.x * 1.1;
                     const cy = 68 + item.z * 0.82;
                     const dotColor =
-                      item.type === 'finale'
+                      item.type === 'temple'
+                        ? '#ff9f1c'
+                        : item.type === 'finale'
                         ? '#e87552'
                         : item.type === 'partner'
                         ? '#ffce70'
@@ -792,7 +819,7 @@ export default function App() {
                         <circle
                           cx={cx}
                           cy={cy}
-                          r={item.type === 'finale' || item.type === 'partner' ? 3.4 : 2.4}
+                          r={item.type === 'temple' ? 4.0 : item.type === 'finale' || item.type === 'partner' ? 3.4 : 2.4}
                           fill={dotColor}
                           stroke="#0e1525"
                           strokeWidth="0.6"
@@ -904,7 +931,9 @@ export default function App() {
             </kbd>
             <div className="text-left">
               <div className="text-[10px] font-semibold tracking-wider text-[#f1aa49]">
-                {nearSpec.type === 'daan-peti'
+                {nearSpec.type === 'temple'
+                  ? 'CLICK GOLDEN AARTI THALI OR PRESS E · PERFORM AARTI'
+                  : nearSpec.type === 'daan-peti'
                   ? 'CLICK BOX OR PRESS E · SCAN CHARITY QR'
                   : nearSpec.type === 'rangoli'
                   ? 'CLICK FLOOR OR PRESS E · PAINT 3D RANGOLI'
@@ -950,12 +979,13 @@ export default function App() {
         </div>
       )}
 
-      {/* ACTIVE MINI-GAME HUD (Balloon Shoot, Ring Toss, Light 7 Diyas, Rangoli Art, Well of Death) */}
+      {/* ACTIVE MINI-GAME HUD (Balloon Shoot, Ring Toss, Light 7 Diyas, Rangoli Art, Well of Death, Temple Aarti) */}
       {gameHud &&
         (mode === 'balloon' ||
           mode === 'ring' ||
           mode === 'diya-game' ||
           mode === 'rangoli' ||
+          mode === 'temple-aarti' ||
           mode === 'well') && (
           <div className="fixed top-4 left-1/2 -translate-x-1/2 z-20 w-[94vw] max-w-xl pointer-events-auto">
             <div className="rounded-2xl bg-[#10182b]/90 backdrop-blur-md border border-[#f1aa49]/50 p-4 shadow-2xl text-center">
@@ -970,6 +1000,8 @@ export default function App() {
                     ? 'DEEPOTSAV MANDAP · LIGHT 7 DIYAS'
                     : gameHud.mode === 'rangoli'
                     ? 'RANGOLI AANGAN · CLICK FLOOR PETALS TO FILL COLORS'
+                    : gameHud.mode === 'temple-aarti'
+                    ? 'SHRI LAXMI-GANESH MAHA-MANDIR · DARSHAN & AARTI THALI'
                     : 'MAUT KA KUAN · WELL OF DEATH'}
                 </span>
                 <span className="font-mono-num text-[#fff5de]">
@@ -977,6 +1009,8 @@ export default function App() {
                     ? `${gameHud.shotsLeft}s left · Rings: ${gameHud.score}/8`
                     : gameHud.mode === 'diya-game'
                     ? `Diyas Lit: ${gameHud.score}/7`
+                    : gameHud.mode === 'temple-aarti'
+                    ? `Aarti Circles: ${gameHud.score}/${gameHud.totalTargets || 5}`
                     : gameHud.mode === 'rangoli'
                     ? `Petals Colored: ${gameHud.score}/${gameHud.totalTargets || 25}`
                     : `${gameHud.shotsLeft} ${gameHud.mode === 'balloon' ? 'shots' : 'rings'} left · Score: ${gameHud.score}`}
@@ -1111,18 +1145,52 @@ export default function App() {
                 </div>
               )}
 
+              {/* SHRI LAXMI-GANESH MAHA-MANDIR: INTERACTIVE AARTI THALI, BELL, PUSHPANJALI & PRASAD */}
+              {gameHud.mode === 'temple-aarti' && (
+                <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => engineRef.current?.performTempleAartiWave()}
+                    className="px-4 py-2 rounded-xl bg-[#f1aa49] text-[#121726] text-xs font-extrabold hover:bg-[#ffbe61] transition-colors shadow-md cursor-pointer"
+                  >
+                    🪔 Wave Golden Aarti Thali
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => engineRef.current?.ringTempleBell()}
+                    className="px-3.5 py-2 rounded-xl bg-[#261a36] border border-[#f1aa49]/55 text-xs font-semibold text-[#ffd27d] hover:bg-[#35234b] transition-colors cursor-pointer"
+                  >
+                    🔔 Ring Mandir Ghanti
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => engineRef.current?.offerTemplePushpanjali()}
+                    className="px-3.5 py-2 rounded-xl bg-[#3b1528] border border-[#ff7597]/50 text-xs font-semibold text-[#ffd6e0] hover:bg-[#521d37] transition-colors cursor-pointer"
+                  >
+                    🌸 Shower Pushpanjali
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => engineRef.current?.offerTemplePrasad()}
+                    className="px-3.5 py-2 rounded-xl bg-[#133330] border border-[#2ec4b6]/50 text-xs font-semibold text-[#b8f7f0] hover:bg-[#1a4743] transition-colors cursor-pointer"
+                  >
+                    🍬 Take Modak &amp; Kheer Prasad
+                  </button>
+                </div>
+              )}
+
               <div className="flex items-center justify-center gap-3">
-                {gameHud.mode === 'rangoli' && (
+                {(gameHud.mode === 'rangoli' || gameHud.mode === 'temple-aarti') && (
                   <button
                     onClick={handleSnapPostcard}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#f1aa49] text-[#121726] text-xs font-bold hover:bg-[#ffbe61] transition-colors cursor-pointer"
                   >
                     <Camera className="w-3.5 h-3.5" />
-                    Snap Rangoli Postcard
+                    {gameHud.mode === 'temple-aarti' ? 'Snap Darshan Postcard' : 'Snap Rangoli Postcard'}
                   </button>
                 )}
 
-                {gameHud.done && activeSpec && gameHud.mode !== 'rangoli' && (
+                {gameHud.done && activeSpec && gameHud.mode !== 'rangoli' && gameHud.mode !== 'temple-aarti' && (
                   <button
                     onClick={() => {
                       if (gameHud.mode === 'well') {
@@ -1445,6 +1513,51 @@ export default function App() {
                 >
                   Baith ke Ram Leela & Deepotsav dekhein →
                 </button>
+              )}
+
+              {/* Grand Shri Laxmi-Ganesh Maha-Mandir */}
+              {talkSpec.type === 'temple' && (
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      const s = talkSpec;
+                      setTalkSpec(null);
+                      engineRef.current?.startTempleAarti(s);
+                    }}
+                    className="w-full px-4 py-3 rounded-xl bg-[#f1aa49] text-[#121726] font-extrabold text-sm hover:bg-[#ffbe61] transition-colors shadow-lg cursor-pointer"
+                  >
+                    🪔 Take Golden Aarti Thali &amp; Perform Laxmi-Ganesh Maha-Aarti →
+                  </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button
+                      onClick={() => {
+                        engineRef.current?.ringTempleBell();
+                        setTalkReply('टन-टन-टन! महा-मंदिर के विशाल पीतल घंटे की पवित्र ध्वनि से चारों दिशाएं गूंज उठीं!');
+                      }}
+                      className="px-3 py-2.5 rounded-xl bg-[#1b2640] border border-[#f1aa49]/40 text-xs font-semibold text-[#ffd27d] hover:bg-[#253457] cursor-pointer"
+                    >
+                      🔔 Ring Mandir Ghanti
+                    </button>
+                    <button
+                      onClick={() => {
+                        engineRef.current?.offerTemplePushpanjali();
+                        setTalkReply('श्री गणेशाय नमः • महालक्ष्म्यै नमः! आपके द्वारा अर्पित गेंदे व गुलाब के पुष्प प्रभु के चरणों में समर्पित हुए।');
+                      }}
+                      className="px-3 py-2.5 rounded-xl bg-[#3b1528] border border-[#ff7597]/45 text-xs font-semibold text-[#ffd6e0] hover:bg-[#521d37] cursor-pointer"
+                    >
+                      🌸 Offer Pushpanjali
+                    </button>
+                    <button
+                      onClick={() => {
+                        engineRef.current?.offerTemplePrasad();
+                        setTalkReply('जय लक्ष्मी-गणेश! केसरिया मोदक और मखाना खीर महा-प्रसाद आपके मेला बैग में रख दिया गया है।');
+                      }}
+                      className="px-3 py-2.5 rounded-xl bg-[#133330] border border-[#2ec4b6]/45 text-xs font-semibold text-[#b8f7f0] hover:bg-[#1a4743] cursor-pointer"
+                    >
+                      🍬 Take Mahaprasad
+                    </button>
+                  </div>
+                </div>
               )}
 
               {/* Well of Death (Maut Ka Kuan) */}

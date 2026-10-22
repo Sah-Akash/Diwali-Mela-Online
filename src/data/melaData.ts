@@ -17,6 +17,7 @@ export type InteractableType =
   | 'daan-peti'
   | 'photo'
   | 'fireworks'
+  | 'temple'
   | 'finale';
 
 export interface RangoliColorSpec {
@@ -89,8 +90,8 @@ export const STALL_SLOTS: StallSlot[] = [
   { id: 'bazaar-east', name: 'Diwali Bazaar · Right Lane', x: 12, z: 4, rotY: -Math.PI / 2 },
   { id: 'rides-west', name: 'Towards Rides · Left Lane', x: -12, z: -16, rotY: Math.PI / 2 },
   { id: 'rides-east', name: 'Towards Rides · Right Lane', x: 12, z: -16, rotY: -Math.PI / 2 },
-  { id: 'mandap-west', name: 'Near Deepotsav Stage · West', x: -18, z: -34, rotY: Math.PI / 3 },
-  { id: 'wheel-east', name: 'Near Giant Wheel · East', x: 18, z: -34, rotY: -Math.PI / 3 },
+  { id: 'mandap-west', name: 'Near Laxmi-Ganesh Mandir · West', x: -20, z: -34, rotY: Math.PI / 3 },
+  { id: 'wheel-east', name: 'Near Laxmi-Ganesh Mandir · East', x: 20, z: -34, rotY: -Math.PI / 3 },
 ];
 
 export const THEME_COLORS: Record<StallTheme, { hex: number; css: string; label: string; accent: string }> = {
@@ -589,12 +590,26 @@ export const CORE_MELA_ATTRACTIONS: MelaInteractableSpec[] = [
     description: 'Ignite golden Anar fountains and multi-color aerial sky bursts over the fair.',
   },
   {
+    id: 'temple-laxmi-ganesh',
+    name: 'Shri Laxmi-Ganesh Maha-Mandir',
+    hindiSub: 'श्री लक्ष्मी-गणेश महा-मंदिर • भव्य दर्शन और आरती थाली',
+    type: 'temple',
+    x: 0,
+    z: -34,
+    rotY: 0,
+    theme: 'kesari',
+    greeting:
+      'जय श्री गणेश! जय माँ लक्ष्मी! पधारिए भक्तजनों! इस भव्य मंदिर में विराजमान विशाल श्री लक्ष्मी-गणेश जी के दर्शन करें, मंदिर की घंटी बजाएं और पावन आरती थाली से महा-आरती उतारें!',
+    description:
+      'Grand towering Hindu Temple at the heart of the Mela featuring colossal idols of Maa Lakshmi and Lord Ganesha, an interactive Golden Aarti Thali, temple bells, Pushpanjali flower shower, and Mahaprasad.',
+  },
+  {
     id: 'finale-akashdeep',
     name: 'Maha Deepotsav & 1008 Akashdeep Finale',
     hindiSub: 'महा-दीपोत्सव • १००८ आकाशदीप और महा-आरती',
     type: 'finale',
     x: 0,
-    z: -56,
+    z: -62,
     rotY: 0,
     theme: 'kesari',
     greeting: 'Tamaso Ma Jyotirgamaya! Swarna Deep-Stambh ko prajwalit karein aur aasman mein saikdon Akashdeep (sky lanterns) udate hue dekhein!',
